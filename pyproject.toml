@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "keppy"
+version = "1.0.0"
+description = ""
+authors = ["Jelmar Gerritsen <jelmargerritsen@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+matplotlib = "^3.8.3"
+numpy = "^1.26.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+ipykernel = "^6.29.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
