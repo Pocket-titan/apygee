@@ -5,12 +5,20 @@ from typing import Literal, Self
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils import complementary_color, darken, deep_diff, omit, shorten_fstring_number
+from utils import (
+    shorten_fstring_number,
+    complementary_color,
+    deep_diff,
+    darken,
+    omit,
+    flatten,
+)
 from kepler import (
     E_from_theta,
     F_from_theta,
     M_from_E,
     M_from_F,
+    angle_between,
     barkers_equation,
     cart_to_kep,
     euler_rotation_matrix,
@@ -107,6 +115,8 @@ class Orbit:
     @classmethod
     def from_cart(cls, cart: ArrayLike, mu: float) -> None:
         """
+        Factory method to create an `Orbit` instance from a cartesian state vector.
+
         Parameters
         ----------
         cart : array_like
@@ -180,7 +190,9 @@ class Orbit:
                 thetas = np.linspace(-np.pi * 9 / 10, np.pi * 9 / 10, num=1000)
             elif self.type == "hyperbolic":
                 theta_asymptote = np.arccos(-1 / self.e)
-                thetas = np.linspace(-theta_asymptote, theta_asymptote, 1000)[1:-1]
+                thetas = np.linspace(-theta_asymptote, theta_asymptote, 1000)[
+                    1:-1
+                ]
         else:
             thetas = np.asarray(thetas, dtype=np.float64).reshape(-1)
         kep = np.repeat(self.kep.reshape((1, -1)), thetas.size, axis=0)
@@ -192,8 +204,14 @@ class Orbit:
 
         return cart[..., :3]
 
-    def intersects(self, orbit: Self) -> tuple[np.ndarray, np.ndarray] | Literal[False]:
-        if self.type not in ["circular", "elliptic"] or orbit.type not in ["circular", "elliptic"]:
+    def intersects(
+        self, orbit: Self
+    ) -> tuple[np.ndarray, np.ndarray] | Literal[False]:
+        # TODO: implement this method
+        if self.type not in ["circular", "elliptic"] or orbit.type not in [
+            "circular",
+            "elliptic",
+        ]:
             raise NotImplementedError(
                 "Intersections are only implemented for circular and elliptic orbits"
             )
@@ -209,9 +227,15 @@ class Orbit:
         beta1 = a1 * e2 * (1 - e1**2)
         beta2 = a2 * e1 * (1 - e2**2)
         A = beta1 * e2 + beta2 * e1 - (beta1 * e1 + beta2 * e2) * np.cos(domega)
-        B = e1**2 + e2**2 - 2 * e1 * e2 * np.cos(domega) - (e1 * e2 * np.sin(domega)) ** 2
+        B = (
+            e1**2
+            + e2**2
+            - 2 * e1 * e2 * np.cos(domega)
+            - (e1 * e2 * np.sin(domega)) ** 2
+        )
         Delta = np.sin(domega) ** 2 * (
-            (beta1**2 - 2 * np.cos(domega) * beta1 * beta2 + beta2**2) * (e1 * e2) ** 2
+            (beta1**2 - 2 * np.cos(domega) * beta1 * beta2 + beta2**2)
+            * (e1 * e2) ** 2
             - (beta1 * e1 - beta2 * e2) ** 2
         )
 
@@ -222,22 +246,45 @@ class Orbit:
         rm = (A - np.sqrt(Delta)) / B
 
         if not (
-            ((a1 * (1 - e1) <= rp <= a1 * (1 + e1)) or (a2 * (1 - e2) <= rp <= a2 * (1 + e2)))
-            and ((a1 * (1 - e1) <= rm <= a1 * (1 + e1)) or (a2 * (1 - e2) <= rm <= a2 * (1 + e2)))
+            (
+                (a1 * (1 - e1) <= rp <= a1 * (1 + e1))
+                or (a2 * (1 - e2) <= rp <= a2 * (1 + e2))
+            )
+            and (
+                (a1 * (1 - e1) <= rm <= a1 * (1 + e1))
+                or (a2 * (1 - e2) <= rm <= a2 * (1 + e2))
+            )
         ):
             return False
 
         cp = (a1 * (1 - e1**2) - rp) / (rp * e1)
-        sp = (a2 * (1 - e2**2) - rp) / (rp * e2) * (1 / np.sin(domega)) - cp * (1 / np.tan(domega))
+        sp = (a2 * (1 - e2**2) - rp) / (rp * e2) * (1 / np.sin(domega)) - cp * (
+            1 / np.tan(domega)
+        )
 
         print(np.sin(domega), np.tan(domega))
 
         cm = (a1 * (1 - e1**2) - rm) / (rm * e1)
-        sm = (a2 * (1 - e2**2) - rm) / (rm * e2) * (1 / np.sin(domega)) - cm * (1 / np.tan(domega))
+        sm = (a2 * (1 - e2**2) - rm) / (rm * e2) * (1 / np.sin(domega)) - cm * (
+            1 / np.tan(domega)
+        )
 
         return (rp * np.array([cp, sp, 0]), rp * np.array([cm, sm, 0]))
 
     def isclose(self, orbit: Self) -> bool:
+        """
+        Returns whether the orbits current position in space `isclose` to the given orbit's position in space.
+
+        Parameters
+        ----------
+        orbit : Orbit
+            orbit to compare with
+
+        Returns
+        -------
+        bool
+            whether the two orbits are currently close in space
+        """
         return np.isclose(self.r_vec, orbit.r_vec)
 
     def is_coplanar_with(self, orbit: Self) -> bool:
@@ -343,14 +390,39 @@ class Orbit:
         plot_foci=False,
         rc={},
         **kwargs,
-    ):
+    ) -> None:
+        """
+        Plot the orbit.
+
+        Parameters
+        ----------
+        theta : float, optional
+            true anomaly at which to plot the position
+        thetas : array_like, optional
+            true anomalies for which to plot the orbit. if `None`, defaults to [0, 2π]
+        ax : plt.Axes, optional
+            axis to plot on. if `None`, creates a new figure
+        plot_vectors : bool, optional
+            whether to plot the eccentricity and inclination vectors
+        plot_foci : bool, optional
+            whether to plot the foci of the ellipse
+        rc : dict, optional
+            matplotlib rc parameters
+        kwargs : dict, optional
+            additional keyword arguments to pass to the main `plt.plot` call responsible
+            for plotting the orbit
+        """
         own_style = omit(
             deep_diff(plt.rcParamsDefault, plt.rcParams),
             plt.style.core.STYLE_BLACKLIST,
         )
         custom_styles = [
             "seaborn-v0_8-darkgrid",
-            {"axes.spines.left": True, "axes.spines.bottom": True, "axes.linewidth": 1},
+            {
+                "axes.spines.left": True,
+                "axes.spines.bottom": True,
+                "axes.linewidth": 1,
+            },
         ]
 
         # There's this weird behaviour where creating a new figure inside a context manager like `plt.style.context` will
@@ -379,14 +451,24 @@ class Orbit:
             else:
                 c = (0, 1, 1)
 
-            ax.ticklabel_format(style="scientific", axis="both", scilimits=(0, 0))
+            ax.ticklabel_format(
+                style="scientific", axis="both", scilimits=(0, 0)
+            )
 
             if theta is not None:
                 assert np.shape(theta) == ()
-                [x, y, z] = kep_to_cart([*self.kep[:5], float(theta)], mu=self.mu)[..., :3]
+                [x, y, z] = kep_to_cart(
+                    [*self.kep[:5], float(theta)], mu=self.mu
+                )[..., :3]
                 cc = complementary_color(c)
 
-                ax.scatter([x], [y], *([[z]] if ax.name == "3d" else []), zorder=3, color=cc)
+                ax.scatter(
+                    [x],
+                    [y],
+                    *([[z]] if ax.name == "3d" else []),
+                    zorder=3,
+                    color=cc,
+                )
                 ax.plot(
                     [0, x],
                     [0, y],
@@ -398,12 +480,18 @@ class Orbit:
 
             if plot_vectors:
                 [xp, yp, zp] = kep_to_cart([*self.kep[:5], 0], mu=self.mu)[:3]
-                [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi], mu=self.mu)[:3]
+                [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi], mu=self.mu)[
+                    :3
+                ]
 
                 colors = ["#CE56DB", "#DB956B", "#555EDB", "#8ADB40", "#4BDBDB"]
 
                 if np.abs([self.i, self.omega, self.Omega]).sum() > 0:
-                    R_inv = np.linalg.inv(euler_rotation_matrix(self.i, self.omega, self.Omega))
+                    R_inv = np.linalg.inv(
+                        euler_rotation_matrix(
+                            self.i, self.omega, self.Omega
+                        ).squeeze()
+                    )
                     asc_node = R_inv @ np.array([xp, yp, zp])
 
                 ax.plot(
@@ -430,12 +518,23 @@ class Orbit:
                     )
 
                 if ax.name == "3d" and abs(self.i) > 0:
-                    [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi / 2], mu=self.mu)[:3]
-                    ax.plot([xa, xa], [ya, ya], [za, 0], color=colors[0], ls="--")
+                    [xa, ya, za] = kep_to_cart(
+                        [*self.kep[:5], np.pi / 2], mu=self.mu
+                    )[:3]
+                    ax.plot(
+                        [xa, xa], [ya, ya], [za, 0], color=colors[0], ls="--"
+                    )
 
-                    ref_orbit = Orbit([self.a, self.e, 0, self.omega, self.Omega, 0], self.mu)
+                    ref_orbit = Orbit(
+                        [self.a, self.e, 0, self.omega, self.Omega, 0], self.mu
+                    )
                     ref_plane = ref_orbit.trajectory()
-                    ax.plot(ref_plane[:, 0], ref_plane[:, 1], ref_plane[:, 2], color=colors[0])
+                    ax.plot(
+                        ref_plane[:, 0],
+                        ref_plane[:, 1],
+                        ref_plane[:, 2],
+                        color=colors[0],
+                    )
 
                 if ax.name == "3d" and abs(self.Omega) > 0:
                     pass
@@ -473,11 +572,28 @@ class Orbit:
                     zorder=2,
                 )
 
-    def visualize(self, fig=None, **kwargs):
+    def visualize(self, fig=None, **kwargs) -> None:
+        """
+        Visualize the orbit interactively.
+
+        Parameters
+        ----------
+        fig : go.FigureWidget, optional
+            plotly FigureWidget to plot on. if `None`, creates a new figure
+        kwargs : dict, optional
+            additional keyword arguments to pass to ?
+        """
         import plotly.express as px
         import plotly.graph_objects as go
         from IPython.display import display
-        from ipywidgets import FloatSlider, HBox, IntSlider, VBox, interactive_output
+        from ipywidgets import (
+            interactive_output,
+            FloatSlider,
+            IntSlider,
+            GridBox,
+            Layout,
+            Label,
+        )
 
         colors = [
             "#66C2A5",
@@ -508,7 +624,9 @@ class Orbit:
         pos0 = calc_position(self.kep)
         position = fig.add_trace(px.scatter_3d(**pos0).data[0])
         r = fig.add_trace(
-            px.line_3d(x=[0, *pos0["x"]], y=[0, *pos0["y"]], z=[0, *pos0["z"]]).data[0]
+            px.line_3d(
+                x=[0, *pos0["x"]], y=[0, *pos0["y"]], z=[0, *pos0["z"]]
+            ).data[0]
         )
 
         orbit.data[0]["line"]["color"] = colors[0]
@@ -540,23 +658,65 @@ class Orbit:
 
         fig.update_traces(line=dict(width=5), marker=dict(size=10))
 
+        slider_layout = Layout(width="100%")
         a = FloatSlider(
             value=a0,
             min=a0 / 2,
             max=2 * a0,
             step=a0 / 100,
-            description="a",
+            layout=slider_layout,
             readout_format=".2e",
         )
-        e = FloatSlider(value=e0, min=0, max=1, step=0.01, description="e")
-        i = IntSlider(value=np.rad2deg(i0), min=0, max=360, step=1, description="i")
-        omega = IntSlider(value=np.rad2deg(omega0), min=0, max=360, step=1, description="ω")
-        Omega = IntSlider(value=np.rad2deg(Omega0), min=0, max=360, step=1, description="Ω")
-        theta = IntSlider(value=np.rad2deg(theta0), min=0, max=360, step=1, description="θ")
+        e = FloatSlider(
+            value=e0,
+            min=0,
+            max=1,
+            step=0.01,
+            layout=slider_layout,
+        )
+        i = IntSlider(
+            value=np.rad2deg(i0),
+            min=0,
+            max=360,
+            step=1,
+            layout=slider_layout,
+        )
+        omega = IntSlider(
+            value=np.rad2deg(omega0),
+            min=0,
+            max=360,
+            step=1,
+            layout=slider_layout,
+        )
+        Omega = IntSlider(
+            value=np.rad2deg(Omega0),
+            min=0,
+            max=360,
+            step=1,
+            layout=slider_layout,
+        )
+        theta = IntSlider(
+            value=np.rad2deg(theta0),
+            min=0,
+            max=360,
+            step=1,
+            layout=slider_layout,
+        )
 
-        ui_left = VBox([a, e, i])
-        ui_right = VBox([omega, Omega, theta])
-        ui = HBox([ui_left, ui_right])
+        labels = ["a", "e", "i", "ω", "Ω", "θ"]
+        labels = [Label(value=x) for x in labels]
+
+        sliders = [a, e, i, omega, Omega, theta]
+
+        items = flatten(zip(labels, sliders))
+        ui = GridBox(
+            items,
+            layout=Layout(
+                grid_template_rows="repeat(3, 1fr)",
+                grid_template_columns="repeat(2, 20px 1fr)",
+                overflow="hidden",
+            ),
+        )
 
         def update(
             a=a0,
@@ -600,7 +760,7 @@ class Orbit:
     # Transfer methods
     def impulsive_shot(
         self,
-        dv0: float,
+        dv0: float | ArrayLike,
         delta0: float = None,
         gamma1: float = None,
         theta: float = None,
@@ -608,6 +768,16 @@ class Orbit:
         """
         Parameters
         ----------
+        dv0 : float or array_like
+            delta-v magnitude or vector
+        delta0 : float, optional
+            angle between the initial velocity vector and the delta-v vector (thrust angle).
+            either `delta0` or `gamma1` must be specified if `dv0` is a float.
+        gamma1 : float, optional
+            angle between the initial and final velocity vector (flight path angle).
+            either `delta0` or `gamma1` must be specified if `dv0` is a float.
+        theta : float, optional
+            true anomaly at which to apply the maneuver. if `None`, uses the current value of `self.theta`
 
         Returns
         -------
@@ -615,16 +785,32 @@ class Orbit:
         Raises
         ------
         """
-        if delta0 is None and gamma1 is None:
-            raise ValueError("Either `d0` or `gamma1` must be specified.")
         if theta is None:
             theta = self.theta
+        if np.size(dv0) <= 1:
+            if delta0 is None and gamma1 is None:
+                raise ValueError(
+                    "Either `delta0` or `gamma1` must be specified if `dv0` is a float."
+                )
+            if delta0 is not None and gamma1 is not None:
+                raise ValueError(
+                    "Only one of `delta0` or `gamma1` must be specified if `dv0` is a float."
+                )
+        else:
+            if delta0 is not None or gamma1 is not None:
+                print(
+                    "Warning: `delta0` and `gamma1` will be ignored if `dv0` is a vector"
+                )
+
+            dv0 = np.asarray(dv0, dtype=np.float64).reshape(-1)
 
         r0 = self.orbital_distance(theta)
         v0 = self.orbital_velocity(theta)
 
         if gamma1 is None:
-            gamma1 = np.arctan(dv0 * np.sin(delta0) / (v0 + dv0 * np.cos(delta0)))
+            gamma1 = np.arctan(
+                dv0 * np.sin(delta0) / (v0 + dv0 * np.cos(delta0))
+            )
         if delta0 is None:
             delta0 = np.arcsin(v0 / dv0 * np.sin(gamma1)) + gamma1
 
@@ -643,7 +829,9 @@ class Orbit:
         theta0 = np.arccos(np.clip(1 / e * (a * (1 - e**2) / r0 - 1), 0, 1))
         return Orbit([a, e, *self.kep[2:5], theta0], mu=self.mu)
 
-    def coplanar_transfer(self, orbit: Self, theta_dep: float, theta_arr: float) -> Self:
+    def coplanar_transfer(
+        self, orbit: Self, theta_dep: float, theta_arr: float
+    ) -> Self:
         """
         If `theta_arr` > `theta_dep`, the transfer orbit is prograde. Otherwise, it's retrograde.
         Example: setting `theta_dep` to π and `theta_arr` to 0 will result in a *retrograde* transfer orbit.
@@ -728,14 +916,20 @@ class Orbit:
         --------
         hohmann_transfer
         """
-        assert orbit.a > self.a, "Orbit must be transferring from inner to outer orbit"
-        assert ra > orbit.ra > self.ra, "`ra` must be larger than both orbits' apoapses"
+        assert (
+            orbit.a > self.a
+        ), "Orbit must be transferring from inner to outer orbit"
+        assert (
+            ra > orbit.ra > self.ra
+        ), "`ra` must be larger than both orbits' apoapses"
 
         rp = self.rp
         a = (rp + ra) / 2
         e = (ra - rp) / (ra + rp)
         first_transfer = Orbit([a, e, *self.kep[2:6]], mu=self.mu)
-        second_transfer = first_transfer.coplanar_transfer(orbit, np.pi, 2 * np.pi)
+        second_transfer = first_transfer.coplanar_transfer(
+            orbit, np.pi, 2 * np.pi
+        )
 
         return (first_transfer, second_transfer)
 
@@ -752,6 +946,14 @@ class Orbit:
         if self.e > 1:
             return "hyperbolic"
         raise Exception("Unknown orbit type, should never happen!")
+
+    @property
+    def orientation(self) -> Literal["prograde", "retrograde"]:
+        "{'prograde', 'retrograde'} : orientation of the orbit"
+        if self.h_vec[-1] < 0:
+            return "retrograde"
+
+        return "prograde"
 
     @property
     def h_vec(self) -> np.ndarray:
@@ -891,78 +1093,39 @@ class Orbit:
         self.kep[5] = value
 
 
-from scipy.optimize import differential_evolution
-
-orbit1 = Orbit([10_000, 0.9, 0, 0.4], mu=3.98e14)
-orbit2 = Orbit([15_000, 0, 0, 0], mu=3.98e14)
-
-
-def func(x):
-    r1 = orbit1.at_theta(x[0]).r_vec
-    r2 = orbit2.at_theta(x[1]).r_vec
-    return np.linalg.norm(r1 - r2)
-
-
-res = differential_evolution(func, bounds=[(0, 2 * np.pi), (0, 2 * np.pi)])
-res
+# %%
+orbit = Orbit([10_000, 0.9, 0.3], mu=3.98e14)
+orbit.plot(plot_vectors=True)
 
 # %%
-
-ax = plt.gca()
-orbit1.plot(ax=ax, theta=3.386, label="Orbit 1")
-orbit2.plot(ax=ax, theta=2.898, label="Orbit 2")
-ax.legend()
+orbit.impulsive_shot()
 
 # %%
-orbit1.intersects(orbit2)
+orbit = Orbit([10], mu=1)
+theta = 0
+
+dv0 = 2
+delta0 = None
+gamma1 = 1.4139806414504958
+
+r0 = orbit.orbital_distance(theta)
+v0 = orbit.orbital_velocity(theta)
+
+if gamma1 is None:
+    gamma1 = np.arctan(dv0 * np.sin(delta0) / (v0 + dv0 * np.cos(delta0)))
+if delta0 is None:
+    delta0 = np.arcsin(v0 / dv0 * np.sin(gamma1)) + gamma1
+
+print(dv0, delta0, gamma1)
+
+V0 = orbit.at_theta(theta).v_vec
+dV0 = np.array([2, 0, 0])
+V1 = V0 + dV0
+
+delta0 = angle_between(V0, dV0)
+gamma1 = angle_between(V0, V1)
+
+print(dV0, delta0, gamma1)
+
 
 # %%
-orbit = Orbit([20_000e3, 1.2], mu=3.98e14).at_theta(np.pi / 2)
-orbit.time_since(), orbit.T / 2
-
-F = F_from_theta(orbit.theta, orbit.e)
-M = M_from_F(F, orbit.e)
-t_from_M(M, hyperbolic_mean_motion(orbit.a, orbit.mu), 0)
-
-# %%
-n = hyperbolic_mean_motion(orbit.a, orbit.mu)
-M = mean_anomaly(n, 778.4340677759866, 0)
-hyperbolic_anomaly(M, orbit.e)
-# %%
-orbit1 = Orbit([10_000, 0, 0.6, 0, 0, 0], mu=3.98e14)
-orbit2 = Orbit([20_000, 0, 0.6, 0, 0, 0], mu=3.98e14)
-
-theta_dep = 0
-theta_arr = np.pi
-
-transfer = orbit1.coplanar_transfer(orbit2, theta_dep, theta_arr)
-
-ax = plt.gca()
-orbit1.plot(ax=ax, label="Orbit 1")
-orbit2.plot(ax=ax, label="Orbit 2")
-transfer.plot(thetas=np.linspace(theta_dep, theta_arr, 100), ax=ax, label="Transfer")
-
-[x, y, _z] = orbit1.at_theta(theta_dep).r_vec
-ax.scatter([x], [y], color="r", label="Departure")
-
-# ax.legend()
-# %%
-[transfer1, transfer2] = orbit1.biellptic_transfer(orbit2, 30_000)
-
-ax = plt.gca()
-orbit1.plot(ax=ax, label="Orbit 1")
-orbit2.plot(ax=ax, label="Orbit 2")
-transfer1.plot(ax=ax, thetas=np.linspace(0, np.pi, 100), label="Transfer 1")
-transfer2.plot(ax=ax, thetas=np.linspace(np.pi, 2 * np.pi, 100), label="Transfer 2")
-
-# %%
-orbit = Orbit([10_000, 1.2], mu=3.98e14)
-n = hyperbolic_mean_motion(orbit.a, orbit.mu)
-M = mean_anomaly(n, 1000, 0)
-hyperbolic_anomaly(M, orbit.e)
-
-# %%
-orbit = Orbit([10_000, 0.7], mu=3.98e14)
-n = mean_motion(orbit.a, orbit.mu)
-M = mean_anomaly(n, 1000, 0)
-eccentric_anomaly(M, orbit.e)

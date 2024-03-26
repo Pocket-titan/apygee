@@ -1,4 +1,6 @@
+import numpy as np
 from matplotlib.colors import hsv_to_rgb, rgb_to_hsv, to_hex, to_rgb, to_rgba
+from numpy.typing import ArrayLike
 
 
 def shorten_fstring_number(x: str):
@@ -32,8 +34,44 @@ def deep_diff(a: dict, b: dict) -> dict:
     return diff
 
 
+def is_iterable(x) -> bool:
+    try:
+        iter(x)
+        return True
+    except TypeError:
+        return False
+
+
+def flatten(x) -> list:
+    out = []
+
+    for i in x:
+        if is_iterable(i):
+            out.extend(flatten(i))
+        else:
+            out.append(i)
+
+    return out
+
+
 def omit(a: dict, keys: list) -> dict:
     return {k: v for k, v in a.items() if k not in keys}
+
+
+def shape_equals(arr: ArrayLike, shape: tuple | list) -> bool:
+    arr_shape = np.shape(arr)
+
+    if arr_shape.length != shape.length:
+        return False
+
+    for i in range(arr_shape.length):
+        if shape[i] == -1:
+            continue
+
+        if arr_shape[i] != shape[i]:
+            return False
+
+    return True
 
 
 def mix_colors(
