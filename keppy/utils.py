@@ -1,6 +1,16 @@
-import numpy as np
-from matplotlib.colors import hsv_to_rgb, rgb_to_hsv, to_hex, to_rgb, to_rgba
+from typing import Any
 from numpy.typing import ArrayLike
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import hsv_to_rgb, rgb_to_hsv, to_hex, to_rgb, to_rgba
+
+
+def maybe_unwrap(x: np.ndarray | Any) -> Any:
+    if hasattr(x, "item") and np.size(x) == 1:
+        return x.item()
+
+    return x
 
 
 def shorten_fstring_number(x: str):
@@ -74,6 +84,145 @@ def shape_equals(arr: ArrayLike, shape: tuple | list) -> bool:
     return True
 
 
+def scale_vector(v: ArrayLike, frac: float, ax=None, origin=[0, 0]) -> np.ndarray:
+    """
+    Scale given vector such that its maximum component has length `frac` of the smallest axis.
+    """
+    origin = np.asarray(origin)
+    v = np.asarray(v)
+
+    with plt.ioff():
+        if ax is None:
+            ax = plt.gca()
+
+        disp_coords = ax.transAxes.transform([[0, 0], [1, 1]])  # axes to display
+        coords = ax.transData.inverted().transform(disp_coords)  # display to data
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        scale = frac * np.min(
+            np.nan_to_num(
+                (coords[1] - coords[0]) / np.abs(v),
+                nan=np.inf,
+            )
+        )
+
+    plt.ion()
+
+    return v * scale
+
+
+def rotate_vector(v: ArrayLike, axis: ArrayLike, angle: float):
+    """
+    Rotates a vector `v` around an arbitrary axis by `angle` radians.
+    """
+    axis = np.asarray(axis, dtype=np.float64)
+    v = np.asarray(v, dtype=np.float64)
+
+    [ux, uy, uz] = axis / np.linalg.norm(axis)
+    R = np.array(
+        [
+            [
+                np.cos(angle) + ux**2 * (1 - np.cos(angle)),
+                ux * uy * (1 - np.cos(angle)) - uz * np.sin(angle),
+                ux * uz * (1 - np.cos(angle)) + uy * np.sin(angle),
+            ],
+            [
+                uy * ux * (1 - np.cos(angle)) + uz * np.sin(angle),
+                np.cos(angle) + uy**2 * (1 - np.cos(angle)),
+                uy * uz * (1 - np.cos(angle)) - ux * np.sin(angle),
+            ],
+            [
+                uz * ux * (1 - np.cos(angle)) - uy * np.sin(angle),
+                uz * uy * (1 - np.cos(angle)) + ux * np.sin(angle),
+                np.cos(angle) + uz**2 * (1 - np.cos(angle)),
+            ],
+        ]
+    )
+
+    return R @ v
+
+
+def plot_vector(
+    v: ArrayLike,
+    origin=[0, 0],
+    ax=None,
+    color=None,
+    plot_components=False,
+    annotations={"v": None, "x": None, "y": None},
+    **kwargs,
+) -> None:
+    origin = np.asarray(origin).ravel()[:2]
+    v = np.asarray(v).ravel()[:2]
+
+    if ax is None:
+        ax = plt.gca()
+
+    [dummy] = ax.plot(*np.stack([origin, origin + v]).T)
+    if color is None:
+        color = dummy.get_color()
+    dummy.remove()
+
+    arrowprops = {"width": 1.5, "headwidth": 12, "headlength": 12, **kwargs}
+
+    ax.annotate(
+        "",
+        xy=origin + v,
+        xytext=origin,
+        xycoords="data",
+        arrowprops={**arrowprops, "color": color},
+    )
+
+    if plot_components and ax.name != "3d":
+        colors = [
+            darken(desaturate(x, 0.6), 0.2) for x in split_complementary_colors(color)
+        ]
+        ax.annotate(
+            "",
+            xy=origin + [v[0], 0],
+            xytext=origin,
+            xycoords="data",
+            arrowprops={**arrowprops, "color": colors[0]},
+        )
+        ax.annotate(
+            "",
+            xy=origin + [0, v[1]],
+            xytext=origin,
+            xycoords="data",
+            arrowprops={**arrowprops, "color": colors[1]},
+        )
+        ax.plot(*np.stack([origin + [v[0], 0], origin + v]).T, lw=2, ls="--", color="0.7")
+        ax.plot(*np.stack([origin + [0, v[1]], origin + v]).T, lw=2, ls="--", color="0.7")
+
+    bg = ax.get_facecolor()
+    for k, text in annotations.items():
+        if text is None or k not in ["x", "y", "v"]:
+            continue
+        if k in ["x", "y"] and not plot_components:
+            continue
+
+        if k == "x":
+            xy = (v[0] * 0.5, 0)
+        if k == "y":
+            xy = (0, v[1] * 0.5)
+        if k == "v":
+            xy = (v[0] * 0.5, v[1] * 0.5)
+
+        if np.allclose(xy, 0):
+            continue
+
+        ax.annotate(
+            f"${text}$",
+            xy=origin + xy,
+            xytext=(0, 0),
+            textcoords="offset points",
+            ha="center",
+            va="center",
+            fontsize=13,
+            color="0.3",
+            bbox=dict(facecolor=bg, edgecolor=bg, pad=0.3),
+        )
+
+
 def mix_colors(
     color1: str | tuple[float],
     color2: str | tuple[float],
@@ -101,6 +250,11 @@ def lighten(color: str | tuple[float], amount: float) -> str:
 
 def darken(color: str | tuple[float], amount: float) -> str:
     return mix_colors(color, "black", 1 - amount)
+
+
+def desaturate(color: str | tuple[float], amount: float) -> str:
+    [h, s, v] = rgb_to_hsv(to_rgb(color))
+    return to_hex(hsv_to_rgb([h, max(0, min(1, s * (1 - amount))), v]))
 
 
 def hilo(a: float, b: float, c: float) -> float:

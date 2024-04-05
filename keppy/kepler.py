@@ -17,6 +17,7 @@ def kep_to_cart(kep: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     cart : np.ndarray
         cartesian state vector: [x, y, z, vx, vy, vz]
     """
+    shape = np.shape(kep)
     kep = np.asarray(kep, dtype=np.float64).reshape((-1, 6))
     [a, e, i, Omega, omega, theta] = kep.T
 
@@ -46,7 +47,7 @@ def kep_to_cart(kep: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     v_rot = np.einsum("ij,ijk->ik", v_w, R)
 
     cart = np.concatenate([r_rot, v_rot], axis=-1)
-    return cart
+    return cart.reshape(shape)
 
 
 def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
@@ -63,6 +64,7 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     kep : np.ndarray
         keplerian elements: `[a, e, i, ω, Ω, θ]`
     """
+    shape = np.shape(cart)
     cart = np.asarray(cart, dtype=np.float64).reshape((-1, 6))
 
     if isinstance(mu, (int, float)):
@@ -117,7 +119,7 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     a[npar] = (h[npar] ** 2 / mu[npar]) / (1 - e[npar] ** 2)
 
     kep = np.stack([a, e, i, Omega, omega, theta], axis=-1)
-    return kep
+    return kep.reshape(shape)
 
 
 def euler_rotation_matrix(
@@ -156,9 +158,7 @@ def eccentricity_vector(r: ArrayLike, v: ArrayLike, mu: float) -> np.ndarray:
     rn = np.linalg.norm(r, axis=-1)
     vn = np.linalg.norm(v, axis=-1)
 
-    return (
-        1 / mu * ((vn**2 - mu / rn)[..., None] * r - dot(r, v)[..., None] * v)
-    )
+    return 1 / mu * ((vn**2 - mu / rn)[..., None] * r - dot(r, v)[..., None] * v)
 
 
 def angular_momentum(r: ArrayLike, v: ArrayLike) -> float:
@@ -239,9 +239,7 @@ def eccentric_anomaly(
         i += 1
 
     if not converged:
-        raise ValueError(
-            f"Eccentric anomaly did not converge in {max_iter} iterations."
-        )
+        raise ValueError(f"Eccentric anomaly did not converge in {max_iter} iterations.")
 
     return E
 
@@ -281,9 +279,7 @@ def hyperbolic_anomaly(
         i += 1
 
     if not converged:
-        raise ValueError(
-            f"Hyperbolic anomaly did not converge in {max_iter} iterations."
-        )
+        raise ValueError(f"Hyperbolic anomaly did not converge in {max_iter} iterations.")
 
     return F
 

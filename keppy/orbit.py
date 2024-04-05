@@ -1,27 +1,20 @@
 # %%
-from numpy.typing import ArrayLike
 from typing import Literal, Self
+from numpy.typing import ArrayLike
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils import (
-    shorten_fstring_number,
-    complementary_color,
-    deep_diff,
-    darken,
-    omit,
-    flatten,
-)
-from kepler import (
+from keppy.kepler import (
     E_from_theta,
     F_from_theta,
     M_from_E,
     M_from_F,
-    angle_between,
     barkers_equation,
     cart_to_kep,
+    eccentric_anomaly,
     euler_rotation_matrix,
+    hyperbolic_anomaly,
     hyperbolic_mean_motion,
     inverse_barkers_equation,
     kep_to_cart,
@@ -30,11 +23,21 @@ from kepler import (
     orbital_distance,
     orbital_plane,
     orbital_velocity,
-    eccentric_anomaly,
-    hyperbolic_anomaly,
     t_from_M,
     theta_from_E,
     theta_from_F,
+)
+from keppy.utils import (
+    complementary_color,
+    darken,
+    deep_diff,
+    flatten,
+    omit,
+    plot_vector,
+    scale_vector,
+    rotate_vector,
+    shorten_fstring_number,
+    maybe_unwrap,
 )
 
 
@@ -47,19 +50,19 @@ class Orbit:
     kep : np.ndarray
         keplerian elements: `[a, e, i, ω, Ω, θ]`
     mu : float
-        gravitational parameter
+        gravitational parameter `μ`
     a : float
-        semi-major axis in meters. if `e=1`, `a` is instead taken as the orbital parameter `p`
+        semi-major axis in meters `a`. if `e=1`, `a` is instead taken as the orbital parameter `p`
     e : float
-        eccentricity
+        eccentricity `e`
     i : float
-        inclination
+        inclination `i`
     omega : float
-        argument of periapsis
+        argument of periapsis `ω`
     Omega : float
-        longitude of the ascending node
+        longitude of the ascending node `Ω`
     theta : float
-        true anomaly
+        true anomaly `θ`
     """
 
     kep: np.ndarray
@@ -69,8 +72,21 @@ class Orbit:
         Parameters
         ----------
         kep : array_like
-            keplerian elements: [a, e, i, ω, Ω, θ].
-            only the first element (a : semi-major axis) is required; the rest is optional and will be 0 if not provided.
+            keplerian elements: `[a, e, i, ω, Ω, θ]`. only the first element (a : semi-major axis)
+            is required; the rest is optional and will be 0 if not provided.
+            the keplerian elements used are:
+                a : float
+                    semi-major axis in meters. if `e=1`, `a` is instead taken as the orbital parameter `p`
+                e : float
+                    eccentricity
+                i : float
+                    inclination
+                omega : float
+                    argument of periapsis
+                Omega : float
+                    longitude of the ascending node
+                theta : float
+                    true anomaly
         mu : float
             gravitational parameter
         """
@@ -101,6 +117,9 @@ class Orbit:
     def __repr__(self) -> str:
         return str(self)
 
+    def __eq__(self, orbit: Self) -> bool:
+        return np.allclose(self.kep[:-1], orbit.kep[:-1]) and self.mu == orbit.mu
+
     def _check(self):
         assert self.e >= 0, "eccentricity must be non-negative"
         assert self.mu >= 0, "gravitational parameter must be non-negative"
@@ -122,7 +141,7 @@ class Orbit:
         cart : array_like
             cartesian state vector: [x, y, z, vx, vy, vz]
         """
-        return cls(cart_to_kep(cart), mu)
+        return cls(cart_to_kep(cart, mu), mu)
 
     # Public methods
     def orbital_distance(self, theta: float = None) -> float:
@@ -142,7 +161,7 @@ class Orbit:
         if theta is None:
             theta = self.theta
 
-        return orbital_distance(self.h, self.mu, self.e, theta)
+        return maybe_unwrap(orbital_distance(self.h, self.mu, self.e, theta))
 
     def orbital_velocity(self, theta: float = None) -> float:
         """
@@ -161,7 +180,7 @@ class Orbit:
         if theta is None:
             theta = self.theta
 
-        return orbital_velocity(self.h, self.mu, self.e, theta)
+        return maybe_unwrap(orbital_velocity(self.h, self.mu, self.e, theta))
 
     def trajectory(
         self,
@@ -190,9 +209,7 @@ class Orbit:
                 thetas = np.linspace(-np.pi * 9 / 10, np.pi * 9 / 10, num=1000)
             elif self.type == "hyperbolic":
                 theta_asymptote = np.arccos(-1 / self.e)
-                thetas = np.linspace(-theta_asymptote, theta_asymptote, 1000)[
-                    1:-1
-                ]
+                thetas = np.linspace(-theta_asymptote, theta_asymptote, 1000)[1:-1]
         else:
             thetas = np.asarray(thetas, dtype=np.float64).reshape(-1)
         kep = np.repeat(self.kep.reshape((1, -1)), thetas.size, axis=0)
@@ -204,9 +221,7 @@ class Orbit:
 
         return cart[..., :3]
 
-    def intersects(
-        self, orbit: Self
-    ) -> tuple[np.ndarray, np.ndarray] | Literal[False]:
+    def intersects(self, orbit: Self) -> tuple[np.ndarray, np.ndarray] | Literal[False]:
         # TODO: implement this method
         if self.type not in ["circular", "elliptic"] or orbit.type not in [
             "circular",
@@ -227,15 +242,9 @@ class Orbit:
         beta1 = a1 * e2 * (1 - e1**2)
         beta2 = a2 * e1 * (1 - e2**2)
         A = beta1 * e2 + beta2 * e1 - (beta1 * e1 + beta2 * e2) * np.cos(domega)
-        B = (
-            e1**2
-            + e2**2
-            - 2 * e1 * e2 * np.cos(domega)
-            - (e1 * e2 * np.sin(domega)) ** 2
-        )
+        B = e1**2 + e2**2 - 2 * e1 * e2 * np.cos(domega) - (e1 * e2 * np.sin(domega)) ** 2
         Delta = np.sin(domega) ** 2 * (
-            (beta1**2 - 2 * np.cos(domega) * beta1 * beta2 + beta2**2)
-            * (e1 * e2) ** 2
+            (beta1**2 - 2 * np.cos(domega) * beta1 * beta2 + beta2**2) * (e1 * e2) ** 2
             - (beta1 * e1 - beta2 * e2) ** 2
         )
 
@@ -313,7 +322,7 @@ class Orbit:
         Orbit
             the orbit at the given true anomaly
         """
-        return Orbit([*self.kep[:5], theta], mu=self.mu)
+        return Orbit([*self.kep[:5], float(theta)], mu=self.mu)
 
     def at_time(self, t: float, tau: float = 0.0) -> Self:
         """
@@ -387,6 +396,7 @@ class Orbit:
         thetas: ArrayLike = None,
         ax: plt.Axes = None,
         plot_vectors=False,
+        plot_velocity=False,
         plot_foci=False,
         rc={},
         **kwargs,
@@ -412,6 +422,7 @@ class Orbit:
             additional keyword arguments to pass to the main `plt.plot` call responsible
             for plotting the orbit
         """
+        current_style = omit(plt.rcParams, plt.style.core.STYLE_BLACKLIST)
         own_style = omit(
             deep_diff(plt.rcParamsDefault, plt.rcParams),
             plt.style.core.STYLE_BLACKLIST,
@@ -419,94 +430,83 @@ class Orbit:
         custom_styles = [
             "seaborn-v0_8-darkgrid",
             {
-                "axes.spines.left": True,
-                "axes.spines.bottom": True,
+                "axes.spines.top": False,
+                "axes.spines.right": False,
+                "axes.edgecolor": (0.2, 0.2, 0.2),
                 "axes.linewidth": 1,
+                "xtick.major.size": 3.5,
+                "ytick.major.size": 3.5,
             },
         ]
 
-        # There's this weird behaviour where creating a new figure inside a context manager like `plt.style.context` will
-        # lead subsequent `plot` calls to try to reuse the existing figure, even when inside a notebook context. Creating
-        # the figure outside the context manager seems to fix this.
+        plt.style.use([*custom_styles, own_style, rc])
+
         if ax is None:
-            fig = plt.figure()
+            ax = plt.gca()
 
-        with plt.style.context([*custom_styles, own_style, rc]):
-            if ax is None:
-                ax = fig.gca()
+        ax.set_aspect("equal")
+        ax.ticklabel_format(style="scientific", axis="both", scilimits=(0, 0))
 
-            ax.set_aspect("equal")
+        if thetas is None or np.size(thetas) > 0:
+            cart = self.trajectory(thetas)
 
-            if thetas is None or np.size(thetas) > 0:
-                cart = self.trajectory(thetas)
-
-                line = ax.plot(
-                    cart[:, 0],
-                    cart[:, 1],
-                    *([cart[:, 2]] if ax.name == "3d" else []),
-                    **kwargs,
-                )
-
-                c = line[-1].get_color()
-            else:
-                c = (0, 1, 1)
-
-            ax.ticklabel_format(
-                style="scientific", axis="both", scilimits=(0, 0)
+            line = ax.plot(
+                cart[:, 0],
+                cart[:, 1],
+                *([cart[:, 2]] if ax.name == "3d" else []),
+                **kwargs,
             )
 
-            if theta is not None:
-                assert np.shape(theta) == ()
-                [x, y, z] = kep_to_cart(
-                    [*self.kep[:5], float(theta)], mu=self.mu
-                )[..., :3]
-                cc = complementary_color(c)
+            c = line[-1].get_color()
+        else:
+            c = (0, 1, 1)
 
-                ax.scatter(
-                    [x],
-                    [y],
-                    *([[z]] if ax.name == "3d" else []),
-                    zorder=3,
-                    color=cc,
+        if theta is not None:
+            assert np.shape(theta) == ()
+            [x, y, z] = kep_to_cart([*self.kep[:5], float(theta)], mu=self.mu)[..., :3]
+            cc = complementary_color(c)
+
+            ax.scatter(
+                [x],
+                [y],
+                *([[z]] if ax.name == "3d" else []),
+                zorder=3,
+                color=cc,
+            )
+            ax.plot(
+                [0, x],
+                [0, y],
+                *([[0, z]] if ax.name == "3d" else []),
+                zorder=0,
+                color=cc,
+                ls="--",
+            )
+
+        if plot_vectors:
+            [xp, yp, zp] = kep_to_cart([*self.kep[:5], 0], mu=self.mu)[:3]
+            [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi], mu=self.mu)[:3]
+
+            colors = ["#CE56DB", "#DB956B", "#555EDB", "#8ADB40", "#4BDBDB"]
+
+            ax.plot(
+                [0, xp],
+                [0, yp],
+                *([[0, zp]] if ax.name == "3d" else []),
+                color=(0.4, 0.4, 0.4),
+            )
+            ax.plot(
+                [0, xa],
+                [0, ya],
+                *([[0, za]] if ax.name == "3d" else []),
+                color=(0.5, 0.5, 0.5),
+                ls="--",
+            )
+
+            if np.abs([self.i, self.omega, self.Omega]).sum() > 0:
+                R_inv = np.linalg.inv(
+                    euler_rotation_matrix(self.i, self.omega, self.Omega).squeeze()
                 )
-                ax.plot(
-                    [0, x],
-                    [0, y],
-                    *([[0, z]] if ax.name == "3d" else []),
-                    zorder=0,
-                    color=cc,
-                    ls="--",
-                )
-
-            if plot_vectors:
-                [xp, yp, zp] = kep_to_cart([*self.kep[:5], 0], mu=self.mu)[:3]
-                [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi], mu=self.mu)[
-                    :3
-                ]
-
-                colors = ["#CE56DB", "#DB956B", "#555EDB", "#8ADB40", "#4BDBDB"]
-
-                if np.abs([self.i, self.omega, self.Omega]).sum() > 0:
-                    R_inv = np.linalg.inv(
-                        euler_rotation_matrix(
-                            self.i, self.omega, self.Omega
-                        ).squeeze()
-                    )
-                    asc_node = R_inv @ np.array([xp, yp, zp])
-
-                ax.plot(
-                    [0, xp],
-                    [0, yp],
-                    *([[0, zp]] if ax.name == "3d" else []),
-                    color=(0.4, 0.4, 0.4),
-                )
-                ax.plot(
-                    [0, xa],
-                    [0, ya],
-                    *([[0, za]] if ax.name == "3d" else []),
-                    color=(0.5, 0.5, 0.5),
-                    ls="--",
-                )
+                asc_node = R_inv @ np.array([xp, yp, zp])
 
                 if abs(self.omega) > 0:
                     ax.plot(
@@ -517,35 +517,35 @@ class Orbit:
                         ls="--",
                     )
 
-                if ax.name == "3d" and abs(self.i) > 0:
-                    [xa, ya, za] = kep_to_cart(
-                        [*self.kep[:5], np.pi / 2], mu=self.mu
-                    )[:3]
-                    ax.plot(
-                        [xa, xa], [ya, ya], [za, 0], color=colors[0], ls="--"
-                    )
+            if ax.name == "3d" and abs(self.i) > 0:
+                [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi / 2], mu=self.mu)[:3]
+                ax.plot([xa, xa], [ya, ya], [za, 0], color=colors[0], ls="--")
 
-                    ref_orbit = Orbit(
-                        [self.a, self.e, 0, self.omega, self.Omega, 0], self.mu
-                    )
-                    ref_plane = ref_orbit.trajectory()
-                    ax.plot(
-                        ref_plane[:, 0],
-                        ref_plane[:, 1],
-                        ref_plane[:, 2],
-                        color=colors[0],
-                    )
+                ref_orbit = Orbit([self.a, self.e, 0, self.omega, self.Omega, 0], self.mu)
+                ref_plane = ref_orbit.trajectory()
+                ax.plot(
+                    ref_plane[:, 0],
+                    ref_plane[:, 1],
+                    ref_plane[:, 2],
+                    color=colors[0],
+                )
 
-                if ax.name == "3d" and abs(self.Omega) > 0:
-                    pass
+            if ax.name == "3d" and abs(self.Omega) > 0:
+                pass
 
-            if plot_foci:
-                [xf1, yf1, zf1] = kep_to_cart(
-                    [self.a * self.e, 0, *self.kep[2:5], np.pi], mu=self.mu
-                )[:3]
-                [xf2, yf2, zf2] = kep_to_cart(
-                    [2 * self.a * self.e, 0, *self.kep[2:5], np.pi], mu=self.mu
-                )[:3]
+        if plot_foci:
+            ax.scatter(
+                [0],
+                [0],
+                *([[0]] if ax.name == "3d" else []),
+                color=darken(c, 0.25),
+                s=30,
+                zorder=2,
+            )
+
+            if self.type == "elliptic":
+                [xf1, yf1, zf1] = kep_to_cart([self.a * self.e, 0, *self.kep[2:5], np.pi], mu=self.mu)[:3]  # fmt: off
+                [xf2, yf2, zf2] = kep_to_cart([2 * self.a * self.e, 0, *self.kep[2:5], np.pi], mu=self.mu)[:3]  # fmt: off
 
                 ax.scatter(
                     [xf2],
@@ -563,14 +563,35 @@ class Orbit:
                     s=50,
                     zorder=2,
                 )
-                ax.scatter(
-                    [0],
-                    [0],
-                    *([[0]] if ax.name == "3d" else []),
-                    color=darken(c, 0.25),
-                    s=30,
-                    zorder=2,
-                )
+
+        if plot_velocity and ax.name != "3d":
+            orbit = self.at_theta(theta) if theta is not None else self
+            scaled_v = scale_vector(orbit.v_vec[:2], 0.5)
+
+            with np.errstate(invalid="ignore", divide="ignore"):
+                scale = scaled_v / orbit.v_vec[:2]
+                scale = scale[np.isfinite(scale)][0]
+
+            plot_vector(
+                scaled_v,
+                ax=ax,
+                annotations={"v": "v"},
+                origin=orbit.r_vec,
+            )
+            plot_vector(
+                orbit.vr * scale,
+                ax=ax,
+                origin=orbit.r_vec,
+                annotations={"v": "v_r"},
+            )
+            plot_vector(
+                orbit.vt * scale,
+                ax=ax,
+                origin=orbit.r_vec,
+                annotations={"v": r"v_\theta"},
+            )
+
+        plt.style.use(current_style)
 
     def visualize(self, fig=None, **kwargs) -> None:
         """
@@ -587,12 +608,12 @@ class Orbit:
         import plotly.graph_objects as go
         from IPython.display import display
         from ipywidgets import (
-            interactive_output,
             FloatSlider,
-            IntSlider,
             GridBox,
-            Layout,
+            IntSlider,
             Label,
+            Layout,
+            interactive_output,
         )
 
         colors = [
@@ -624,9 +645,7 @@ class Orbit:
         pos0 = calc_position(self.kep)
         position = fig.add_trace(px.scatter_3d(**pos0).data[0])
         r = fig.add_trace(
-            px.line_3d(
-                x=[0, *pos0["x"]], y=[0, *pos0["y"]], z=[0, *pos0["z"]]
-            ).data[0]
+            px.line_3d(x=[0, *pos0["x"]], y=[0, *pos0["y"]], z=[0, *pos0["z"]]).data[0]
         )
 
         orbit.data[0]["line"]["color"] = colors[0]
@@ -760,78 +779,26 @@ class Orbit:
     # Transfer methods
     def impulsive_shot(
         self,
-        dv0: float | ArrayLike,
-        delta0: float = None,
-        gamma1: float = None,
+        dv: float | ArrayLike,
+        x: float,
         theta: float = None,
     ) -> Self:
-        """
-        Parameters
-        ----------
-        dv0 : float or array_like
-            delta-v magnitude or vector
-        delta0 : float, optional
-            angle between the initial velocity vector and the delta-v vector (thrust angle).
-            either `delta0` or `gamma1` must be specified if `dv0` is a float.
-        gamma1 : float, optional
-            angle between the initial and final velocity vector (flight path angle).
-            either `delta0` or `gamma1` must be specified if `dv0` is a float.
-        theta : float, optional
-            true anomaly at which to apply the maneuver. if `None`, uses the current value of `self.theta`
-
-        Returns
-        -------
-
-        Raises
-        ------
-        """
         if theta is None:
             theta = self.theta
-        if np.size(dv0) <= 1:
-            if delta0 is None and gamma1 is None:
-                raise ValueError(
-                    "Either `delta0` or `gamma1` must be specified if `dv0` is a float."
-                )
-            if delta0 is not None and gamma1 is not None:
-                raise ValueError(
-                    "Only one of `delta0` or `gamma1` must be specified if `dv0` is a float."
-                )
+
+        v0 = self.at_theta(theta).v_vec
+
+        if np.size(dv) <= 1:
+            uv = v0 / np.linalg.norm(v0)
+            v1 = v0 + rotate_vector(uv, self.h_vec, x) * dv
         else:
-            if delta0 is not None or gamma1 is not None:
-                print(
-                    "Warning: `delta0` and `gamma1` will be ignored if `dv0` is a vector"
-                )
+            dv = np.asarray(dv).ravel()
+            assert dv.size == 3, "dv must be a 3d vector"
+            v1 = v0 + dv
 
-            dv0 = np.asarray(dv0, dtype=np.float64).reshape(-1)
+        return Orbit.from_cart(np.concatenate([self.r_vec, v1]), mu=self.mu)
 
-        r0 = self.orbital_distance(theta)
-        v0 = self.orbital_velocity(theta)
-
-        if gamma1 is None:
-            gamma1 = np.arctan(
-                dv0 * np.sin(delta0) / (v0 + dv0 * np.cos(delta0))
-            )
-        if delta0 is None:
-            delta0 = np.arcsin(v0 / dv0 * np.sin(gamma1)) + gamma1
-
-        v1 = np.sqrt(v0**2 + dv0**2 + 2 * v0 * dv0 * np.cos(delta0))
-        eps = v1**2 / 2 - self.mu / r0
-        h = r0 * v1 * np.cos(gamma1)
-        p = h**2 / self.mu
-
-        a = -self.mu / (2 * eps)
-        e = np.sqrt(1 - p / a)
-
-        if e > 1:
-            a *= -1
-
-        # NOTE: how mathematically justified is clipping here?
-        theta0 = np.arccos(np.clip(1 / e * (a * (1 - e**2) / r0 - 1), 0, 1))
-        return Orbit([a, e, *self.kep[2:5], theta0], mu=self.mu)
-
-    def coplanar_transfer(
-        self, orbit: Self, theta_dep: float, theta_arr: float
-    ) -> Self:
+    def coplanar_transfer(self, orbit: Self, theta_dep: float, theta_arr: float) -> Self:
         """
         If `theta_arr` > `theta_dep`, the transfer orbit is prograde. Otherwise, it's retrograde.
         Example: setting `theta_dep` to π and `theta_arr` to 0 will result in a *retrograde* transfer orbit.
@@ -857,7 +824,7 @@ class Orbit:
         dtheta = theta_arr - theta_dep
         r_arr = orbit.orbital_distance(theta_arr)
 
-        if orbit.a > self.a:
+        if orbit.orbital_distance(theta_dep) > self.orbital_distance(theta_dep):
             # Transferring from inner to outer orbit
             rp = self.orbital_distance(theta_dep)
             e = (rp - r_arr) / (r_arr * np.cos(dtheta) - rp)
@@ -901,7 +868,7 @@ class Orbit:
 
         return self.coplanar_transfer(orbit, np.pi, 2 * np.pi)
 
-    def biellptic_transfer(self, orbit: Self, ra: float) -> tuple[Self, Self]:
+    def bielliptic_transfer(self, orbit: Self, ra: float) -> tuple[Self, Self]:
         """
         Parameters
         ----------
@@ -916,20 +883,14 @@ class Orbit:
         --------
         hohmann_transfer
         """
-        assert (
-            orbit.a > self.a
-        ), "Orbit must be transferring from inner to outer orbit"
-        assert (
-            ra > orbit.ra > self.ra
-        ), "`ra` must be larger than both orbits' apoapses"
+        assert orbit.a > self.a, "Orbit must be transferring from inner to outer orbit"
+        assert ra > orbit.ra > self.ra, "`ra` must be larger than both orbits' apoapses"
 
         rp = self.rp
         a = (rp + ra) / 2
         e = (ra - rp) / (ra + rp)
         first_transfer = Orbit([a, e, *self.kep[2:6]], mu=self.mu)
-        second_transfer = first_transfer.coplanar_transfer(
-            orbit, np.pi, 2 * np.pi
-        )
+        second_transfer = first_transfer.coplanar_transfer(orbit, np.pi, 2 * np.pi)
 
         return (first_transfer, second_transfer)
 
@@ -1014,6 +975,28 @@ class Orbit:
         return np.sqrt(self.mu * (2 / self.r - 1 / self.a))
 
     @property
+    def vr(self) -> float:
+        "float : radial velocity component"
+        ur = self.r_vec / self.r  # radial unit vector
+        return self.mu / self.h * self.e * np.sin(self.theta) * ur
+
+    @property
+    def vt(self) -> float:
+        "float : tangential velocity component"
+        a = np.pi / 2
+        R = np.array(
+            [
+                [np.cos(a), -np.sin(a), 0],
+                [np.sin(a), np.cos(a), 0],
+                [0, 0, 1],
+            ]
+        )
+
+        ur = self.r_vec / self.r  # radial unit vector
+        ut = R @ ur  # tangential unit vector
+        return self.mu / self.h * (1 + self.e * np.cos(self.theta)) * ut
+
+    @property
     def T(self) -> float:
         "float : orbital period"
         if self.type in ["circular", "elliptic"]:
@@ -1022,6 +1005,11 @@ class Orbit:
             return np.sqrt(16 / 9 * self.p**3 / self.mu)
 
         return np.inf
+
+    @property
+    def gamma(self) -> float:
+        "float : flight-path angle"
+        return np.arctan(self.e * np.sin(self.theta) / (1 + self.e * np.cos(self.theta)))
 
     @property
     def orbital_plane(self) -> np.ndarray:
@@ -1091,41 +1079,3 @@ class Orbit:
     @theta.setter
     def theta(self, value: float) -> None:
         self.kep[5] = value
-
-
-# %%
-orbit = Orbit([10_000, 0.9, 0.3], mu=3.98e14)
-orbit.plot(plot_vectors=True)
-
-# %%
-orbit.impulsive_shot()
-
-# %%
-orbit = Orbit([10], mu=1)
-theta = 0
-
-dv0 = 2
-delta0 = None
-gamma1 = 1.4139806414504958
-
-r0 = orbit.orbital_distance(theta)
-v0 = orbit.orbital_velocity(theta)
-
-if gamma1 is None:
-    gamma1 = np.arctan(dv0 * np.sin(delta0) / (v0 + dv0 * np.cos(delta0)))
-if delta0 is None:
-    delta0 = np.arcsin(v0 / dv0 * np.sin(gamma1)) + gamma1
-
-print(dv0, delta0, gamma1)
-
-V0 = orbit.at_theta(theta).v_vec
-dV0 = np.array([2, 0, 0])
-V1 = V0 + dV0
-
-delta0 = angle_between(V0, dV0)
-gamma1 = angle_between(V0, V1)
-
-print(dV0, delta0, gamma1)
-
-
-# %%
