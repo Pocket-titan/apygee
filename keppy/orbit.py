@@ -48,7 +48,7 @@ class Orbit:
     Attributes
     ----------
     kep : np.ndarray
-        keplerian elements: `[a, e, i, ω, Ω, θ]`
+        keplerian elements: `[a, e, i, Ω, ω, θ]`
     mu : float
         gravitational parameter `μ`
     a : float
@@ -57,10 +57,10 @@ class Orbit:
         eccentricity `e`
     i : float
         inclination `i`
-    omega : float
-        argument of periapsis `ω`
     Omega : float
         longitude of the ascending node `Ω`
+    omega : float
+        argument of periapsis `ω`
     theta : float
         true anomaly `θ`
     """
@@ -72,7 +72,7 @@ class Orbit:
         Parameters
         ----------
         kep : array_like
-            keplerian elements: `[a, e, i, ω, Ω, θ]`. only the first element (a : semi-major axis)
+            keplerian elements: `[a, e, i, Ω, ω, θ]`. only the first element (a : semi-major axis)
             is required; the rest is optional and will be 0 if not provided.
             the keplerian elements used are:
                 a : float
@@ -81,10 +81,10 @@ class Orbit:
                     eccentricity
                 i : float
                     inclination
-                omega : float
-                    argument of periapsis
                 Omega : float
                     longitude of the ascending node
+                omega : float
+                    argument of periapsis
                 theta : float
                     true anomaly
         mu : float
@@ -106,8 +106,8 @@ class Orbit:
                 f"a={self.a:.2e}",
                 f"e={self.e:.2f}",
                 f"i={self.i:.2f}",
-                f"ω={self.omega:.2f}",
                 f"Ω={self.Omega:.2f}",
+                f"ω={self.omega:.2f}",
                 f"θ={self.theta:.2f}",
             ],
         )
@@ -255,28 +255,18 @@ class Orbit:
         rm = (A - np.sqrt(Delta)) / B
 
         if not (
-            (
-                (a1 * (1 - e1) <= rp <= a1 * (1 + e1))
-                or (a2 * (1 - e2) <= rp <= a2 * (1 + e2))
-            )
-            and (
-                (a1 * (1 - e1) <= rm <= a1 * (1 + e1))
-                or (a2 * (1 - e2) <= rm <= a2 * (1 + e2))
-            )
+            ((a1 * (1 - e1) <= rp <= a1 * (1 + e1)) or (a2 * (1 - e2) <= rp <= a2 * (1 + e2)))
+            and ((a1 * (1 - e1) <= rm <= a1 * (1 + e1)) or (a2 * (1 - e2) <= rm <= a2 * (1 + e2)))
         ):
             return False
 
         cp = (a1 * (1 - e1**2) - rp) / (rp * e1)
-        sp = (a2 * (1 - e2**2) - rp) / (rp * e2) * (1 / np.sin(domega)) - cp * (
-            1 / np.tan(domega)
-        )
+        sp = (a2 * (1 - e2**2) - rp) / (rp * e2) * (1 / np.sin(domega)) - cp * (1 / np.tan(domega))
 
         print(np.sin(domega), np.tan(domega))
 
         cm = (a1 * (1 - e1**2) - rm) / (rm * e1)
-        sm = (a2 * (1 - e2**2) - rm) / (rm * e2) * (1 / np.sin(domega)) - cm * (
-            1 / np.tan(domega)
-        )
+        sm = (a2 * (1 - e2**2) - rm) / (rm * e2) * (1 / np.sin(domega)) - cm * (1 / np.tan(domega))
 
         return (rp * np.array([cp, sp, 0]), rp * np.array([cm, sm, 0]))
 
@@ -780,7 +770,7 @@ class Orbit:
     def impulsive_shot(
         self,
         dv: float | ArrayLike,
-        x: float,
+        x: float = None,
         theta: float = None,
     ) -> Self:
         if theta is None:
@@ -789,14 +779,18 @@ class Orbit:
         v0 = self.at_theta(theta).v_vec
 
         if np.size(dv) <= 1:
+            assert x is not None, "x must be provided if dv is a scalar"
             uv = v0 / np.linalg.norm(v0)
             v1 = v0 + rotate_vector(uv, self.h_vec, x) * dv
         else:
+            if x is not None:
+                print("Warning: x is ignored if dv is a vector")
+
             dv = np.asarray(dv).ravel()
             assert dv.size == 3, "dv must be a 3d vector"
             v1 = v0 + dv
 
-        return Orbit.from_cart(np.concatenate([self.r_vec, v1]), mu=self.mu)
+        return Orbit.from_cart(np.concatenate([self.at_theta(theta).r_vec, v1]), mu=self.mu)
 
     def coplanar_transfer(self, orbit: Self, theta_dep: float, theta_arr: float) -> Self:
         """
@@ -1054,21 +1048,21 @@ class Orbit:
         self.kep[2] = value
 
     @property
-    def omega(self) -> float:
-        "float : argument of periapsis"
-        return self.kep[3]
-
-    @omega.setter
-    def omega(self, value: float) -> None:
-        self.kep[3] = value
-
-    @property
     def Omega(self) -> float:
         "float : longitude of the ascending node"
-        return self.kep[4]
+        return self.kep[3]
 
     @Omega.setter
     def Omega(self, value: float) -> None:
+        self.kep[3] = value
+
+    @property
+    def omega(self) -> float:
+        "float : argument of periapsis"
+        return self.kep[4]
+
+    @omega.setter
+    def omega(self, value: float) -> None:
         self.kep[4] = value
 
     @property
@@ -1079,3 +1073,6 @@ class Orbit:
     @theta.setter
     def theta(self, value: float) -> None:
         self.kep[5] = value
+
+
+# %%

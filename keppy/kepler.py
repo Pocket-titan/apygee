@@ -85,30 +85,49 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     h_vec = np.cross(r_vec, v_vec, axis=-1)
     h = np.linalg.norm(h_vec, axis=-1)
 
-    # Step 3: inclination
-    i = np.arccos(h_vec[:, -1] / h)
+    # Step 3: eccentricity
+    e_vec = np.cross(v_vec, h_vec, axis=-1) / mu[:, None] - r_vec / r
+    e = np.linalg.norm(e_vec, axis=-1)
+    circ = np.isclose(e, 0)
 
-    # Step 4: right ascension of the ascending node
+    # Step 4: inclination
+    i = np.arccos(h_vec[:, -1] / h)
+    equi = np.isclose(i, 0)
+
+    # Step 5: right ascension of the ascending node
     K = np.array([0, 0, 1])
     N_vec = np.cross(K, h_vec)
     N = np.linalg.norm(N_vec, axis=-1)
-    Omega = np.arccos(N_vec[:, 0] / N)
-    Omega[N_vec[:, 1] < 0] = 2 * np.pi - Omega[N_vec[:, 1] < 0]
 
-    # Step 5: eccentricity
-    e_vec = np.cross(v_vec, h_vec, axis=-1) / mu[:, None] - r_vec / r
-    e = np.linalg.norm(e_vec, axis=-1)
+    # If i == 0 or i == π, Omega is undefined: set to 0
+    with np.errstate(invalid="ignore"):
+        Omega = np.nan_to_num(np.arccos(N_vec[:, 0] / N), nan=0.0)
+        Omega[equi] = 0.0
+
+    Omega = np.mod(Omega, 2 * np.pi)
+    Omega[N_vec[:, 1] < 0] = 2 * np.pi - Omega[N_vec[:, 1] < 0]
 
     # Step 6: argument of periapsis
     pro = e_vec[:, -1] >= 0
     retro = ~pro
-    omega = np.arccos(dot(N_vec, e_vec) / (N * e))
+
+    # If i == 0 or i == π, omega is undefined: set to 2d case
+    with np.errstate(invalid="ignore"):
+        omega = np.nan_to_num(np.arccos(dot(N_vec, e_vec) / (N * e)), nan=0.0)
+    omega[equi & circ] = 0.0  # could also set to π
+    omega[equi & ~circ] = np.arctan2(e_vec[equi & ~circ, 1], e_vec[equi & ~circ, 0])
+
+    omega = np.mod(omega, 2 * np.pi)
     omega[retro] = 2 * np.pi - omega[retro]
 
     # Step 7: true anomaly
     away = v_r >= 0
     towards = ~away
-    theta = np.arccos(dot(r_vec / r, e_vec / e[:, None]))
+
+    with np.errstate(invalid="ignore"):
+        theta = np.nan_to_num(np.arccos(dot(r_vec / r, e_vec / e[:, None])), nan=0.0)
+
+    theta = np.mod(theta, 2 * np.pi)
     theta[towards] = 2 * np.pi - theta[towards]
 
     # Step 8: semi-major axis
@@ -180,9 +199,7 @@ def parabolic_angular_momentum(a: float, mu: float) -> float:
     return np.sqrt(mu * np.abs(a))  # p = a, not p = 2 * a
 
 
-def specific_orbital_energy(
-    r: float | ArrayLike, v: float | ArrayLike, mu: float
-) -> float:
+def specific_orbital_energy(r: float | ArrayLike, v: float | ArrayLike, mu: float) -> float:
     if not isinstance(r, (int, float)):
         r = np.asarray(r, dtype=np.float64).reshape((-1, 3))
         r = np.linalg.norm(r, axis=-1)
@@ -221,9 +238,7 @@ def mean_anomaly(n: float, t: float, tau: float = 0.0) -> float:
     return n * (t - tau)
 
 
-def eccentric_anomaly(
-    M: float, e: float, atol: float = 1e-9, max_iter: int = 1000
-) -> float:
+def eccentric_anomaly(M: float, e: float, atol: float = 1e-9, max_iter: int = 1000) -> float:
     converged = False
     E = M
     i = 0
@@ -258,9 +273,7 @@ def M_from_E(E: float, e: float) -> float:
     return E - e * np.sin(E)
 
 
-def hyperbolic_anomaly(
-    M: float, e: float, atol: float = 1e-9, max_iter: int = 1000
-) -> float:
+def hyperbolic_anomaly(M: float, e: float, atol: float = 1e-9, max_iter: int = 1000) -> float:
     """
     Newton iteration
     """
