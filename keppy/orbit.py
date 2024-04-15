@@ -431,9 +431,7 @@ class Orbit:
 
         plt.style.use([*custom_styles, own_style, rc])
 
-        if ax is None:
-            ax = plt.gca()
-
+        ax = ax or plt.gca()
         ax.set_aspect("equal")
         ax.ticklabel_format(style="scientific", axis="both", scilimits=(0, 0))
 

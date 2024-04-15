@@ -2,7 +2,7 @@
 import numpy as np
 from keppy.orbit import Orbit
 from keppy.kepler import angle_between
-from keppy.utils import plot_vector, rotate_vector, scale_vector
+from keppy.utils import plot_vector, rotate_vector, scale_vector, plot_angle
 from keppy.constants import (
     MERCURY,
     VENUS,
@@ -18,7 +18,7 @@ from keppy.constants import (
 
 import matplotlib.pyplot as plt
 
-np.set_printoptions(precision=11, suppress=True)
+np.set_printoptions(precision=3, suppress=True)
 
 custom_styles = [
     "seaborn-v0_8-darkgrid",
@@ -125,11 +125,8 @@ transfer.plot(theta=transfer.theta)
 print(transfer.r_vec)
 print(orbit.at_theta(theta).r_vec)
 # %%
-print(theta)
-print(transfer.omega)
-print(transfer.theta)
-# %%
-transfer.theta - transfer.omega + theta
+orbit = Orbit([10_000, 0.3, 0.2, 0.4, 0.9, 1.2], mu=MU_EARTH)
+orbit.plot(theta=np.pi / 2, plot_vectors=True)
 
 
 # %%
@@ -150,385 +147,481 @@ def plot_3d_vector():
 
 
 # %%
-from matplotlib.patches import Arc
+from numpy.typing import ArrayLike
+from keppy.kepler import cart_to_kep, kep_to_cart, euler_rotation_matrix
+from keppy.utils import darken, complementary_color, omit, deep_diff
 
 
-# %%
-import matplotlib.pyplot as plt
-import numpy as np
-
-from matplotlib.patches import Arc
-from matplotlib.transforms import Bbox, IdentityTransform, TransformedBbox
-
-
-class AngleAnnotation(Arc):
+def plot(
+    self,
+    theta: float = None,
+    thetas: ArrayLike = None,
+    ax: plt.Axes = None,
+    plot_vectors=False,
+    plot_velocity=False,
+    plot_foci=False,
+    rc={},
+    **kwargs,
+) -> None:
     """
-    Draws an arc between two vectors which appears circular in display space.
+    Plot the orbit.
+
+    Parameters
+    ----------
+    theta : float, optional
+        true anomaly at which to plot the position
+    thetas : array_like, optional
+        true anomalies for which to plot the orbit. if `None`, defaults to [0, 2π]
+    ax : plt.Axes, optional
+        axis to plot on. if `None`, creates a new figure
+    plot_vectors : bool, optional
+        whether to plot the eccentricity and inclination vectors
+    plot_foci : bool, optional
+        whether to plot the foci of the ellipse
+    rc : dict, optional
+        matplotlib rc parameters
+    kwargs : dict, optional
+        additional keyword arguments to pass to the main `plt.plot` call responsible
+        for plotting the orbit
     """
+    current_style = omit(plt.rcParams, plt.style.core.STYLE_BLACKLIST)
+    own_style = omit(
+        deep_diff(plt.rcParamsDefault, plt.rcParams),
+        plt.style.core.STYLE_BLACKLIST,
+    )
+    custom_styles = [
+        "seaborn-v0_8-darkgrid",
+        {
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "axes.edgecolor": (0.2, 0.2, 0.2),
+            "axes.linewidth": 1,
+            "xtick.major.size": 3.5,
+            "ytick.major.size": 3.5,
+        },
+    ]
 
-    def __init__(
-        self,
-        xy,
-        p1,
-        p2,
-        size=75,
-        unit="points",
-        ax=None,
-        text="",
-        textposition="inside",
-        text_kw=None,
-        **kwargs,
-    ):
-        """
-        Parameters
-        ----------
-        xy, p1, p2 : tuple or array of two floats
-            Center position and two points. Angle annotation is drawn between
-            the two vectors connecting *p1* and *p2* with *xy*, respectively.
-            Units are data coordinates.
+    plt.style.use([*custom_styles, own_style, rc])
 
-        size : float
-            Diameter of the angle annotation in units specified by *unit*.
+    ax = ax or plt.gca()
+    ax.set_aspect("equal")
+    ax.ticklabel_format(style="scientific", axis="both", scilimits=(0, 0))
 
-        unit : str
-            One of the following strings to specify the unit of *size*:
+    if thetas is None or np.size(thetas) > 0:
+        cart = self.trajectory(thetas)
 
-            * "pixels": pixels
-            * "points": points, use points instead of pixels to not have a
-              dependence on the DPI
-            * "axes width", "axes height": relative units of Axes width, height
-            * "axes min", "axes max": minimum or maximum of relative Axes
-              width, height
-
-        ax : `matplotlib.axes.Axes`
-            The Axes to add the angle annotation to.
-
-        text : str
-            The text to mark the angle with.
-
-        textposition : {"inside", "outside", "edge"}
-            Whether to show the text in- or outside the arc. "edge" can be used
-            for custom positions anchored at the arc's edge.
-
-        text_kw : dict
-            Dictionary of arguments passed to the Annotation.
-
-        **kwargs
-            Further parameters are passed to `matplotlib.patches.Arc`. Use this
-            to specify, color, linewidth etc. of the arc.
-
-        """
-        self.ax = ax or plt.gca()
-        self._xydata = xy  # in data coordinates
-        self.vec1 = p1
-        self.vec2 = p2
-        self.size = size
-        self.unit = unit
-        self.textposition = textposition
-
-        super().__init__(
-            self._xydata, size, size, angle=0.0, theta1=self.theta1, theta2=self.theta2, **kwargs
-        )
-
-        self.set_transform(IdentityTransform())
-        self.ax.add_patch(self)
-
-        self.kw = dict(
-            ha="center",
-            va="center",
-            xycoords=IdentityTransform(),
-            xytext=(0, 0),
-            textcoords="offset points",
-            annotation_clip=True,
-        )
-        self.kw.update(text_kw or {})
-        self.text = ax.annotate(text, xy=self._center, **self.kw)
-
-    def get_size(self):
-        factor = 1.0
-        if self.unit == "points":
-            factor = self.ax.figure.dpi / 72.0
-        elif self.unit[:4] == "axes":
-            b = TransformedBbox(Bbox.unit(), self.ax.transAxes)
-            dic = {
-                "max": max(b.width, b.height),
-                "min": min(b.width, b.height),
-                "width": b.width,
-                "height": b.height,
-            }
-            factor = dic[self.unit[5:]]
-        return self.size * factor
-
-    def set_size(self, size):
-        self.size = size
-
-    def get_center_in_pixels(self):
-        """return center in pixels"""
-        return self.ax.transData.transform(self._xydata)
-
-    def set_center(self, xy):
-        """set center in data coordinates"""
-        self._xydata = xy
-
-    def get_theta(self, vec):
-        vec_in_pixels = self.ax.transData.transform(vec) - self._center
-        return np.rad2deg(np.arctan2(vec_in_pixels[1], vec_in_pixels[0]))
-
-    def get_theta1(self):
-        return self.get_theta(self.vec1)
-
-    def get_theta2(self):
-        return self.get_theta(self.vec2)
-
-    def set_theta(self, angle):
-        pass
-
-    # Redefine attributes of the Arc to always give values in pixel space
-    _center = property(get_center_in_pixels, set_center)
-    theta1 = property(get_theta1, set_theta)
-    theta2 = property(get_theta2, set_theta)
-    width = property(get_size, set_size)
-    height = property(get_size, set_size)
-
-    # The following two methods are needed to update the text position.
-    def draw(self, renderer):
-        self.update_text()
-        super().draw(renderer)
-
-    def update_text(self):
-        c = self._center
-        s = self.get_size()
-        angle_span = (self.theta2 - self.theta1) % 360
-        angle = np.deg2rad(self.theta1 + angle_span / 2)
-        r = s / 2
-        if self.textposition == "inside":
-            r = s / np.interp(angle_span, [60, 90, 135, 180], [3.3, 3.5, 3.8, 4])
-        self.text.xy = c + r * np.array([np.cos(angle), np.sin(angle)])
-        if self.textposition == "outside":
-
-            def R90(a, r, w, h):
-                if a < np.arctan(h / 2 / (r + w / 2)):
-                    return np.sqrt((r + w / 2) ** 2 + (np.tan(a) * (r + w / 2)) ** 2)
-                else:
-                    c = np.sqrt((w / 2) ** 2 + (h / 2) ** 2)
-                    T = np.arcsin(c * np.cos(np.pi / 2 - a + np.arcsin(h / 2 / c)) / r)
-                    xy = r * np.array([np.cos(a + T), np.sin(a + T)])
-                    xy += np.array([w / 2, h / 2])
-                    return np.sqrt(np.sum(xy**2))
-
-            def R(a, r, w, h):
-                aa = (a % (np.pi / 4)) * ((a % (np.pi / 2)) <= np.pi / 4) + (
-                    np.pi / 4 - (a % (np.pi / 4))
-                ) * ((a % (np.pi / 2)) >= np.pi / 4)
-                return R90(aa, r, *[w, h][:: int(np.sign(np.cos(2 * a)))])
-
-            bbox = self.text.get_window_extent()
-            X = R(angle, r, bbox.width, bbox.height)
-            trans = self.ax.figure.dpi_scale_trans.inverted()
-            offs = trans.transform(((X - s / 2), 0))[0] * 72
-            self.text.set_position([offs * np.cos(angle), offs * np.sin(angle)])
-
-
-# %%
-class Angle(Arc):
-    """
-    Draws an arc between two vectors which appears circular in display space.
-    """
-
-    def __init__(
-        self,
-        xy,
-        p1,
-        p2,
-        unit="points",
-        ax=None,
-        **kwargs,
-    ):
-        self.ax = ax or plt.gca()
-        self._xydata = xy  # in data coordinates
-        self.vec1 = p1
-        self.vec2 = p2
-        self.unit = unit
-
-        v1 = self.ax.transData.transform(self.vec1) - self._center
-        v2 = self.ax.transData.transform(self.vec2) - self._center
-        vn1 = np.linalg.norm(v1)
-        vn2 = np.linalg.norm(v2)
-        print(vn1, vn2)
-        size = np.min([vn1, vn2])
-        self.size = size
-
-        super().__init__(
-            self._xydata,
-            size,
-            size,
-            angle=0.0,
-            theta1=self.theta1,
-            theta2=self.theta2,
+        line = ax.plot(
+            cart[:, 0],
+            cart[:, 1],
+            *([cart[:, 2]] if ax.name == "3d" else []),
             **kwargs,
         )
 
-        # self.set_transform(IdentityTransform())
-        self.ax.add_patch(self)
+        c = line[-1].get_color()
+    else:
+        c = (0, 1, 1)
 
-    # def get_size(self):
-    #     factor = 1.0
-    #     if self.unit == "points":
-    #         factor = self.ax.figure.dpi / 72.0
-    #     elif self.unit[:4] == "axes":
-    #         b = TransformedBbox(Bbox.unit(), self.ax.transAxes)
-    #         dic = {
-    #             "max": max(b.width, b.height),
-    #             "min": min(b.width, b.height),
-    #             "width": b.width,
-    #             "height": b.height,
-    #         }
-    #         factor = dic[self.unit[5:]]
-    #     return self.size * factor
+    if theta is not None:
+        assert np.shape(theta) == ()
+        [x, y, z] = kep_to_cart([*self.kep[:5], float(theta)], mu=self.mu)[..., :3]
+        cc = complementary_color(c)
 
-    def get_size(self):
-        return self.size
+        ax.scatter(
+            [x],
+            [y],
+            *([[z]] if ax.name == "3d" else []),
+            zorder=3,
+            color=cc,
+        )
+        ax.plot(
+            [0, x],
+            [0, y],
+            *([[0, z]] if ax.name == "3d" else []),
+            zorder=0,
+            color=cc,
+            ls="--",
+        )
 
-    def set_size(self, size):
-        self.size = size
+    if plot_vectors:
+        [xp, yp, zp] = kep_to_cart([*self.kep[:5], 0], mu=self.mu)[:3]
+        [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi], mu=self.mu)[:3]
 
-    def get_center_in_pixels(self):
-        """return center in pixels"""
-        return self.ax.transData.transform(self._xydata)
+        colors = ["#CE56DB", "#DB956B", "#555EDB", "#8ADB40", "#4BDBDB"]
 
-    def get_center(self):
-        return self._xydata
+        ax.plot(
+            [0, xp],
+            [0, yp],
+            *([[0, zp]] if ax.name == "3d" else []),
+            color=(0.4, 0.4, 0.4),
+        )
+        ax.plot(
+            [0, xa],
+            [0, ya],
+            *([[0, za]] if ax.name == "3d" else []),
+            color=(0.5, 0.5, 0.5),
+            ls="--",
+        )
 
-    def set_center(self, xy):
-        """set center in data coordinates"""
-        self._xydata = xy
+        # Draw the ascending node if we have one
+        if np.abs(self.i) > 0:
+            R_inv = np.linalg.inv(euler_rotation_matrix(self.i, self.omega, self.Omega).squeeze())
+            asc_node = R_inv @ np.array([xp, yp, zp])
 
-    def get_theta(self, vec):
-        vec_in_pixels = self.ax.transData.transform(vec) - self._center
-        return np.rad2deg(np.arctan2(vec_in_pixels[1], vec_in_pixels[0]))
+            ref_dir = np.array([1, 0, 0])
+            asc_node = rotate_vector(ref_dir, [0, 0, 1], self.Omega) * 7000
 
-    def get_theta1(self):
-        return self.get_theta(self.vec1)
+            print(np.linalg.norm(asc_node), self.rp)
 
-    def get_theta2(self):
-        return self.get_theta(self.vec2)
+            arg = rotate_vector(asc_node, self.h_vec, self.omega)
 
-    def set_theta(self, angle):
-        pass
+            # Plot argument of periapsis
+            if abs(self.omega) > 0:
+                ax.plot(
+                    [0, asc_node[0]],
+                    [0, asc_node[1]],
+                    *([[0, asc_node[2]]] if ax.name == "3d" else []),
+                    color=colors[2],
+                    ls="--",
+                )
 
-    # Redefine attributes of the Arc to always give values in pixel space
-    # _center = property(get_center_in_pixels, set_center)
-    _center = property(get_center, set_center)
-    theta1 = property(get_theta1, set_theta)
-    theta2 = property(get_theta2, set_theta)
-    width = property(get_size, set_size)
-    height = property(get_size, set_size)
+                ax.plot(
+                    [0, arg[0]],
+                    [0, arg[1]],
+                    *([[0, arg[2]]] if ax.name == "3d" else []),
+                    color=colors[2],
+                    ls="--",
+                )
+
+        if ax.name == "3d":
+            pass
+        else:
+            pass
+
+        if ax.name == "3d" and abs(self.i) > 0:
+            [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi / 2], mu=self.mu)[:3]
+            ax.plot([xa, xa], [ya, ya], [za, 0], color=colors[0], ls="--")
+
+            ref_orbit = Orbit([self.a, self.e, 0, self.omega, self.Omega, 0], self.mu)
+            ref_plane = ref_orbit.trajectory()
+            ax.plot(
+                ref_plane[:, 0],
+                ref_plane[:, 1],
+                ref_plane[:, 2],
+                color=colors[0],
+            )
+
+        if ax.name == "3d" and abs(self.Omega) > 0:
+            pass
+
+    if plot_foci:
+        ax.scatter(
+            [0],
+            [0],
+            *([[0]] if ax.name == "3d" else []),
+            color=darken(c, 0.25),
+            s=30,
+            zorder=2,
+        )
+
+        if self.type == "elliptic":
+            [xf1, yf1, zf1] = kep_to_cart([self.a * self.e, 0, *self.kep[2:5], np.pi], mu=self.mu)[:3]  # fmt: off
+            [xf2, yf2, zf2] = kep_to_cart([2 * self.a * self.e, 0, *self.kep[2:5], np.pi], mu=self.mu)[:3]  # fmt: off
+
+            ax.scatter(
+                [xf2],
+                [yf2],
+                *([[zf2]] if ax.name == "3d" else []),
+                color=darken(c, 0.25),
+                s=30,
+                zorder=2,
+            )
+            ax.scatter(
+                [xf1],
+                [yf1],
+                *([[zf1]] if ax.name == "3d" else []),
+                color=c,
+                s=50,
+                zorder=2,
+            )
+
+    if plot_velocity:
+        if ax.name == "3d":
+            pass
+        else:
+            orbit = self.at_theta(theta) if theta is not None else self
+            scaled_v = scale_vector(orbit.v_vec[:2], 0.5)
+
+            with np.errstate(invalid="ignore", divide="ignore"):
+                scale = scaled_v / orbit.v_vec[:2]
+                scale = scale[np.isfinite(scale)][0]
+
+            plot_vector(
+                scaled_v,
+                ax=ax,
+                annotations={"v": "v"},
+                origin=orbit.r_vec,
+            )
+            plot_vector(
+                orbit.vr * scale,
+                ax=ax,
+                origin=orbit.r_vec,
+                annotations={"v": "v_r"},
+            )
+            plot_vector(
+                orbit.vt * scale,
+                ax=ax,
+                origin=orbit.r_vec,
+                annotations={"v": r"v_\theta"},
+            )
+
+    plt.style.use(current_style)
 
 
-ax = plt.gca()
+# orbit = Orbit([10_000, 0.3, 0.2, 0.4, 0.9, 1.2], mu=MU_EARTH)
+orbit = Orbit([10_000, 0.3, 0.2, 2.2, np.pi / 2], mu=MU_EARTH)
+plot(orbit, theta=0.5, plot_vectors=True)
 
-v1 = np.array([7, 7]) * 1
-v2 = np.array([0.5, 4]) * 1
-
-angles = np.array([angle_between(v1, [1, 0]), angle_between(v2, [1, 0])])
-theta1, theta2 = angles.take(np.argsort(angles))
-middle = (theta1 + theta2) / 2
-angle = angle_between(v1, v2)
-
-vn = np.min([np.linalg.norm(v1), np.linalg.norm(v2)])
-an = 0.3 * vn
-vmid = np.array([np.cos(middle), np.sin(middle)]) * an
-
-p1 = np.array([np.cos(theta1), np.sin(theta1)]) * an
-p2 = np.array([np.cos(theta2), np.sin(theta2)]) * an
-
-plot_vector(v1, ax=ax)
-plot_vector(v2, ax=ax)
-plot_vector(p1)
-plot_vector(p2)
-plot_vector(vmid)
-center = p1 + (p2 - p1) / 2
-
-[width, height] = np.diff(np.stack([ax.get_xlim(), ax.get_ylim()])).ravel()
-coords = ax.transAxes.transform([[0, vmid[0] / width], [0, vmid[1] / height]])
-size = 2 * np.linalg.norm(coords[:, 1] - coords[:, 0])
-
-# ax.add_patch(patch := AngleAnnotation((0, 0), v1, v2, ax=ax, size=300, unit="points", text="θ"))
-ax.add_patch(Angle((0, 0), v1, v2, size=10))
 
 # %%
-fig, ax = plt.subplots()
+orbit.plot()
 
-v1 = np.array([7, 7]) * 1
-v2 = np.array([0.5, 4]) * 1
+theta = np.pi / 2
+self = orbit
 
-angles = np.array([angle_between(v1, [1, 0]), angle_between(v2, [1, 0])])
-theta1, theta2 = angles.take(np.argsort(angles))
-middle = (theta1 + theta2) / 2
-angle = angle_between(v1, v2)
+if not np.isclose(self.i, 0):
+    asc_node = self.at_theta(-self.omega).r_vec
+    periapsis = self.at_theta(0).r_vec
 
-vn = np.min([np.linalg.norm(v1), np.linalg.norm(v2)])
-an = 0.3 * vn
-vmid = np.array([np.cos(middle), np.sin(middle)]) * an
+    apoapsis = self.at_theta(np.pi).r_vec
+    plot_vector(apoapsis, annotations=r"$r_a$")
 
-p1 = np.array([np.cos(theta1), np.sin(theta1)]) * an
-p2 = np.array([np.cos(theta2), np.sin(theta2)]) * an
+    plot_vector(periapsis, annotations=r"$r_p$")
+    plot_vector(asc_node, annotations=r"$☊$")
+    plot_angle(asc_node, periapsis, r"$\omega$", size=0.75 * self.rp)
 
-plot_vector(v1, ax=ax)
-plot_vector(v2, ax=ax)
-plot_vector(p1)
-plot_vector(p2)
-plot_vector(vmid)
-center = p1 + (p2 - p1) / 2
+    if theta is not None:
+        plot_vector(self.at_theta(theta).r_vec, annotations=r"$r$")
+        plot_angle(periapsis, self.at_theta(theta).r_vec, r"$\theta$", size=0.75 * self.rp)
 
-[width, height] = np.diff(np.stack([ax.get_xlim(), ax.get_ylim()])).ravel()
-coords = ax.transAxes.transform([[0, vmid[0] / width], [0, vmid[1] / height]])
-size = 2 * np.linalg.norm(coords[:, 1] - coords[:, 0])
+    if not np.isclose(self.Omega, 0):
+        ref_dir = np.array([1, 0, 0]) * 0.75 * self.rp / 2
+        plot_angle(ref_dir, asc_node, r"$\Omega$", size=0.75 * self.rp)
+        plot_vector(ref_dir, annotations=r"$♈︎$")
 
-# ax.add_patch(patch := AngleAnnotation((0, 0), v1, v2, ax=ax, size=300, unit="points", text="θ"))
-ax.set_aspect("equal")
-ax.add_patch(
-    arc := Arc(
-        (0, 0), 2 * an, 2 * an, angle=0, theta1=np.rad2deg(theta1), theta2=np.rad2deg(theta2)
+
+# %%
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d.proj3d import proj_transform
+from mpl_toolkits.mplot3d.axes3d import Axes3D
+from matplotlib.patches import Circle, PathPatch, Arc, Ellipse
+import mpl_toolkits.mplot3d.art3d as art3d
+from matplotlib.text import Annotation
+from matplotlib.path import Path
+
+
+class Annotation3D(Annotation):
+    def __init__(self, text, xyz, *args, **kwargs):
+        super().__init__(text, xy=(0, 0), *args, **kwargs)
+        self._xyz = xyz
+
+    def draw(self, renderer):
+        x2, y2, z2 = proj_transform(*self._xyz, self.axes.M)
+        self.xy = (x2, y2)
+        super().draw(renderer)
+
+
+class Arrow3D(FancyArrowPatch):
+    def __init__(self, x, y, z, dx, dy, dz, *args, **kwargs):
+        super().__init__((0, 0), (0, 0), *args, **kwargs)
+        self._xyz = (x, y, z)
+        self._dxdydz = (dx, dy, dz)
+
+    def draw(self, renderer):
+        x1, y1, z1 = self._xyz
+        dx, dy, dz = self._dxdydz
+        x2, y2, z2 = (x1 + dx, y1 + dy, z1 + dz)
+
+        xs, ys, zs = proj_transform((x1, x2), (y1, y2), (z1, z2), self.axes.M)
+        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+        super().draw(renderer)
+
+    def do_3d_projection(self, renderer=None):
+        x1, y1, z1 = self._xyz
+        dx, dy, dz = self._dxdydz
+        x2, y2, z2 = (x1 + dx, y1 + dy, z1 + dz)
+
+        xs, ys, zs = proj_transform((x1, x2), (y1, y2), (z1, z2), self.axes.M)
+        self.set_positions((xs[0], ys[0]), (xs[1], ys[1]))
+
+        return np.min(zs)
+
+
+def plot_3d_vector(v, origin=[0, 0, 0], ax=None):
+    if ax is None:
+        fig = plt.gcf()
+
+        if len(fig.axes) > 0 and fig.gca().name == "3d":
+            ax = fig.gca()
+        else:
+            ax = fig.add_subplot(projection="3d")
+
+    origin = np.asarray(origin).ravel()[:3]
+    v = np.asarray(v).ravel()[:3]
+
+    bg = ax.get_facecolor()
+
+    annotation = Annotation3D("a", (0, 0, 0), bbox=dict(facecolor=bg, edgecolor=bg, pad=0.3))
+    ax.add_artist(annotation)
+
+    arrow = Arrow3D(*origin, *(origin + v), mutation_scale=20, edgecolor=bg)
+    ax.add_artist(arrow)
+
+
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
+
+
+# patch = Circle((0, 0), 1)
+# patch = Ellipse((0, 0), 2, 3)
+
+theta1 = 180
+theta2 = 0
+
+patch = Arc((0, 0), 2, 2)
+ax.add_patch(patch)
+patch._path = Path.arc(theta1, theta2)
+art3d.pathpatch_2d_to_3d(patch, z=0, zdir="z")
+
+patch._segment3d = rotate_vector(patch._segment3d, [1, 0, 0], np.pi / 4)
+
+
+ax.set_xlim3d(-2, 2)
+ax.set_ylim3d(-2, 2)
+ax.set_zlim3d(-2, 2)
+
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+ax.set_zlabel("z")
+
+
+ax.view_init(elev=40, azim=10)
+
+plot_3d_vector([2, 0, 0])
+plot_3d_vector([-2, 0, 0])
+
+
+# %%
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
+
+v1 = np.asarray([4, -1, 0])
+v2 = np.asarray([-2, 1, 1])
+
+v = v2 - v1
+mid = v1 + v / 2
+angle1 = angle_between(v1, v2)
+
+a = np.array([-1, 0, 0])
+b = mid / np.linalg.norm(mid)
+axis = np.cross(a, b)
+angle2 = angle_between(a, b)
+
+theta1 = 360 - np.rad2deg(angle1)
+theta2 = 0
+
+patch = Arc((0, 0), 2, 2)
+ax.add_patch(patch)
+patch._path = Path.arc(theta1, theta2)
+art3d.pathpatch_2d_to_3d(patch, z=0, zdir="z")
+patch._segment3d = rotate_vector(patch._segment3d, axis, -angle2)
+
+plot_3d_vector(v1)
+plot_3d_vector(v2)
+
+ax.set_xlim(-2, 2)
+ax.set_ylim(-2, 2)
+ax.set_zlim(-2, 2)
+
+plot_arc3d(v1, v2, radius=1)
+ax.view_init(elev=-20, azim=10)
+
+# %%
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection, Line3DCollection
+
+
+def plot_arc3d(v1, v2, radius=0.2, ax=None):
+    """Plot arc between two given vectors in 3D space."""
+
+    v1 = np.asarray(v1).ravel()[:3]
+    v2 = np.asarray(v2).ravel()[:3]
+
+    if ax is None:
+        fig = plt.gcf()
+
+        if len(fig.axes) > 0 and fig.gca().name == "3d":
+            ax = fig.gca()
+        else:
+            ax = fig.add_subplot(projection="3d")
+
+    v = v1 - v2
+    v_pts = np.apply_along_axis(
+        lambda x: v2 + v * x, 1, np.linspace(0, 1, num=50)[None, :].repeat(3, 0).T
     )
+    v_phis = np.arctan2(v_pts[:, 1], v_pts[:, 0])
+    v_thetas = np.arccos(v_pts[:, 2] / np.linalg.norm(v_pts, axis=-1))
+
+    v_points_arc = np.concatenate(
+        [
+            np.stack(
+                [
+                    radius * np.sin(v_thetas) * np.cos(v_phis),
+                    radius * np.sin(v_thetas) * np.sin(v_phis),
+                    radius * np.cos(v_thetas),
+                ],
+                axis=-1,
+            ),
+        ],
+        axis=0,
+    )
+
+    points_collection = Line3DCollection([v_points_arc], alpha=1)
+    # points_collection.set_facecolor(colour)
+    points_collection.set_edgecolor("k")
+    ax.add_collection3d(points_collection)
+
+    return fig
+
+
+# %%
+radius = 0.2
+v1 = np.asarray([2, -1, 0])
+v2 = np.asarray([2, 1, 0])
+
+v = v1 - v2
+v_pts = np.apply_along_axis(
+    lambda x: v2 + v * x, 1, np.linspace(0, 1, num=15)[None, :].repeat(3, 0).T
+)
+v_phis = np.arctan2(v_pts[:, 1], v_pts[:, 0])
+v_thetas = np.arccos(v_pts[:, 2] / np.linalg.norm(v_pts, axis=-1))
+
+v_points_arc = np.concatenate(
+    [
+        np.stack(
+            [
+                radius * np.sin(v_thetas) * np.cos(v_phis),
+                radius * np.sin(v_thetas) * np.sin(v_phis),
+                radius * np.cos(v_thetas),
+            ],
+            axis=-1,
+        ),
+        [[0, 0, 0]],
+    ],
+    axis=0,
 )
 
-transf = arc.get_transform()
-transf.transform([2 * an, 2 * an])
+fig = plt.figure()
+ax = fig.add_subplot(projection="3d")
 
-
-# ax.add_patch(AngleAnnotation((1.5, 0), [1, 1], [2, 2], ax=ax))
-# ax.plot([1.5, 1], [0, 1])
-# ax.plot([1.5, 2], [0, 2])
-
-# %%
-ax = plt.gca()
-
-v3 = np.array([7, 7]) * 6
-v4 = np.array([1, 1])
-
-plot_vector(v3, ax=ax)
-plot_vector(v1, ax=ax)
-
-coords = ax.transData.transform(v3)
-print(coords)
-
-ax.transLimits.transform(v3)  # data to axes
-
-limits = np.stack([ax.get_xlim(), ax.get_ylim()])
-ax.transAxes.transform(limits)  # axes to display
-
-
-ax.add_patch(Arc((10, 10), 2 * 10, 2 * 10, angle=0, theta1=0, theta2=360))
-
-
-# %%
-patch.get_size()
-
-
-# %%
-ax = plt.gca()
-plt.get_backend()
-# %%
-plt.rcParams
-# %%
+ax.scatter(*v_points_arc.T)
+plot_3d_vector(v1)
+plot_3d_vector(v2)

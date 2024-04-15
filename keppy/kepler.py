@@ -161,7 +161,10 @@ def euler_rotation_matrix(
             [c3 * s1 + c1 * c2 * s3, c1 * c2 * c3 - s1 * s3, -c1 * s2],
             [s2 * s3, c3 * s2, c2],
         ]
-    ).transpose((2, 0, 1))
+    )
+
+    if len(R.shape) > 2:
+        R = R.transpose((2, 0, 1))
 
     return R
 
@@ -358,4 +361,4 @@ def dot(a: ArrayLike, b: ArrayLike) -> np.ndarray:
 def angle_between(a: ArrayLike, b: ArrayLike) -> float:
     a = np.asarray(a, dtype=np.float64)
     b = np.asarray(b, dtype=np.float64)
-    return np.arccos(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+    return np.arccos(np.clip(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)), -1, 1))
