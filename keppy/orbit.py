@@ -5,7 +5,9 @@ from numpy.typing import ArrayLike
 import matplotlib.pyplot as plt
 import numpy as np
 
+from keppy.plot import plot_vector, plot_angle
 from keppy.kepler import (
+    angle_between,
     E_from_theta,
     F_from_theta,
     M_from_E,
@@ -13,7 +15,6 @@ from keppy.kepler import (
     barkers_equation,
     cart_to_kep,
     eccentric_anomaly,
-    euler_rotation_matrix,
     hyperbolic_anomaly,
     hyperbolic_mean_motion,
     inverse_barkers_equation,
@@ -28,12 +29,9 @@ from keppy.kepler import (
     theta_from_F,
 )
 from keppy.utils import (
-    complementary_color,
-    darken,
     deep_diff,
     flatten,
     omit,
-    plot_vector,
     scale_vector,
     rotate_vector,
     shorten_fstring_number,
@@ -348,6 +346,9 @@ class Orbit:
 
         return self.at_theta(theta)
 
+    def with_inclination(self, i: float) -> Self:
+        return Orbit([*self.kep[:2], i, *self.kep[3:]], mu=self.mu)
+
     def time_since(self, tau: float = 0.0) -> float:
         """
         Parameters
@@ -385,9 +386,8 @@ class Orbit:
         theta: float = None,
         thetas: ArrayLike = None,
         ax: plt.Axes = None,
-        plot_vectors=False,
-        plot_velocity=False,
-        plot_foci=False,
+        labels=None,
+        show=[],
         rc={},
         **kwargs,
     ) -> None:
@@ -402,7 +402,7 @@ class Orbit:
             true anomalies for which to plot the orbit. if `None`, defaults to [0, 2π]
         ax : plt.Axes, optional
             axis to plot on. if `None`, creates a new figure
-        plot_vectors : bool, optional
+        plot_elements : bool, optional
             whether to plot the eccentricity and inclination vectors
         plot_foci : bool, optional
             whether to plot the foci of the ellipse
@@ -428,156 +428,190 @@ class Orbit:
                 "ytick.major.size": 3.5,
             },
         ]
-
         plt.style.use([*custom_styles, own_style, rc])
 
         ax = ax or plt.gca()
         ax.set_aspect("equal")
         ax.ticklabel_format(style="scientific", axis="both", scilimits=(0, 0))
+        is_3d = ax.name == "3d"
+        _self = self
+
+        if is_3d:
+            ax.computed_zorder = False
+        elif not np.isclose(self.i, [0, np.pi]).any():
+            _self = _self.with_inclination(0)
+
+        _self = _self.at_theta(theta or self.theta)
 
         if thetas is None or np.size(thetas) > 0:
-            cart = self.trajectory(thetas)
+            cart = _self.trajectory(thetas)
 
-            line = ax.plot(
+            [line] = ax.plot(
                 cart[:, 0],
                 cart[:, 1],
-                *([cart[:, 2]] if ax.name == "3d" else []),
+                *([cart[:, 2]] if is_3d else []),
                 **kwargs,
             )
 
-            c = line[-1].get_color()
+            zorder = line.get_zorder()
         else:
-            c = (0, 1, 1)
+            zorder = 2
 
+        if isinstance(show, str):
+            show = [show]
         if theta is not None:
-            assert np.shape(theta) == ()
-            [x, y, z] = kep_to_cart([*self.kep[:5], float(theta)], mu=self.mu)[..., :3]
-            cc = complementary_color(c)
+            show = [*(show or []), "r"]
+        if not show:
+            return
 
-            ax.scatter(
-                [x],
-                [y],
-                *([[z]] if ax.name == "3d" else []),
-                zorder=3,
-                color=cc,
-            )
-            ax.plot(
-                [0, x],
-                [0, y],
-                *([[0, z]] if ax.name == "3d" else []),
-                zorder=0,
-                color=cc,
-                ls="--",
-            )
+        keys = [
+            "i",
+            "omega",
+            "Omega",
+            "theta",
+            "r",
+            "r_p",
+            "r_a",
+            "n",
+            "x",
+            "z",
+            "h",
+            "v",
+            "v_r",
+            "v_theta",
+        ]
+        _map = dict.fromkeys(keys, False)
 
-        if plot_vectors:
-            [xp, yp, zp] = kep_to_cart([*self.kep[:5], 0], mu=self.mu)[:3]
-            [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi], mu=self.mu)[:3]
+        aliases = [
+            ["i", "inclination"],
+            ["omega", "ω", "argument of periapsis"],
+            ["Omega", "Ω", "longitude of ascending node"],
+            ["theta", "θ", "true anomaly"],
+            ["r", "position"],
+            ["r_p", "periapsis"],
+            ["r_a", "apoapsis"],
+            ["n", "node", "ascending node", "asc_node"],
+            ["x", "longitude of periapsis"],
+            ["z", "k"],
+            ["h", "angular momentum", "orbital angular momentum"],
+            ["v", "velocity"],
+            ["v_r", "radial velocity"],
+            ["v_theta", "v_θ", "v_⊥", "tangential velocity", "azimuthal velocity"],
+        ]
 
-            colors = ["#CE56DB", "#DB956B", "#555EDB", "#8ADB40", "#4BDBDB"]
+        if "all" in show:
+            for k in keys:
+                _map[k] = True
+        else:
+            for s in show:
+                for a in aliases:
+                    if s in a:
+                        _map[a[0]] = True
 
-            ax.plot(
-                [0, xp],
-                [0, yp],
-                *([[0, zp]] if ax.name == "3d" else []),
-                color=(0.4, 0.4, 0.4),
-            )
-            ax.plot(
-                [0, xa],
-                [0, ya],
-                *([[0, za]] if ax.name == "3d" else []),
-                color=(0.5, 0.5, 0.5),
-                ls="--",
-            )
+            if "angles" in show:
+                for k in ["i", "omega", "Omega", "theta"]:
+                    _map[k] = True
 
-            if np.abs([self.i, self.omega, self.Omega]).sum() > 0:
-                R_inv = np.linalg.inv(
-                    euler_rotation_matrix(self.i, self.omega, self.Omega).squeeze()
-                )
-                asc_node = R_inv @ np.array([xp, yp, zp])
+            if "vectors" in show:
+                for k in ["r_p", "r_a", "n"]:
+                    _map[k] = True
 
-                if abs(self.omega) > 0:
-                    ax.plot(
-                        [0, asc_node[0]],
-                        [0, asc_node[1]],
-                        *([[0, asc_node[2]]] if ax.name == "3d" else []),
-                        color=colors[2],
-                        ls="--",
-                    )
+        _labels = [
+            r"$i$",
+            r"$\omega$",
+            r"$\Omega$",
+            r"$\theta$",
+            r"$r$",
+            r"$r_p$",
+            r"$r_a$",
+            r"$☊$",
+            r"$♈︎$",
+            r"$z$",
+            r"$h$",
+            r"$v$",
+            r"$v_r$",
+            r"$v_\theta$",
+        ]
+        label_map = dict(zip(keys, _labels))
 
-            if ax.name == "3d" and abs(self.i) > 0:
-                [xa, ya, za] = kep_to_cart([*self.kep[:5], np.pi / 2], mu=self.mu)[:3]
-                ax.plot([xa, xa], [ya, ya], [za, 0], color=colors[0], ls="--")
+        if isinstance(labels, dict):
+            for k in keys:
+                label_map[k] = ""
+            label_map.update(labels or {})
 
-                ref_orbit = Orbit([self.a, self.e, 0, self.omega, self.Omega, 0], self.mu)
-                ref_plane = ref_orbit.trajectory()
-                ax.plot(
-                    ref_plane[:, 0],
-                    ref_plane[:, 1],
-                    ref_plane[:, 2],
-                    color=colors[0],
-                )
+        angle_radius = np.min([_self.rp * 0.6, np.mean([_self.rp, _self.ra]) / 3.5])
+        vector_norm = np.mean([_self.rp, _self.ra]) / 1.5
+        vkwargs = dict(arrow_kwargs=dict(zorder=zorder + 1), text_kwargs=dict(zorder=zorder + 3))
+        akwargs = dict(angle_kwargs=dict(zorder=zorder + 2), text_kwargs=dict(zorder=zorder + 4))
 
-            if ax.name == "3d" and abs(self.Omega) > 0:
-                pass
+        r = _self.r_vec
+        r_p = _self.at_theta(0).r_vec
+        r_a = _self.at_theta(np.pi).r_vec
+        h_dir = (self.h_vec / self.h) * vector_norm
+        x_dir = np.array([1, 0, 0]) * vector_norm
+        z_dir = np.array([0, 0, 1]) * vector_norm
 
-        if plot_foci:
-            ax.scatter(
-                [0],
-                [0],
-                *([[0]] if ax.name == "3d" else []),
-                color=darken(c, 0.25),
-                s=30,
-                zorder=2,
-            )
+        if not np.isclose(self.i, [0, np.pi]).any():
+            asc_node = _self.at_theta(-_self.omega).r_vec
 
-            if self.type == "elliptic":
-                [xf1, yf1, zf1] = kep_to_cart([self.a * self.e, 0, *self.kep[2:5], np.pi], mu=self.mu)[:3]  # fmt: off
-                [xf2, yf2, zf2] = kep_to_cart([2 * self.a * self.e, 0, *self.kep[2:5], np.pi], mu=self.mu)[:3]  # fmt: off
+            if _map["n"]:
+                plot_vector(asc_node, text=label_map["n"], **vkwargs)
 
-                ax.scatter(
-                    [xf2],
-                    [yf2],
-                    *([[zf2]] if ax.name == "3d" else []),
-                    color=darken(c, 0.25),
-                    s=30,
-                    zorder=2,
-                )
-                ax.scatter(
-                    [xf1],
-                    [yf1],
-                    *([[zf1]] if ax.name == "3d" else []),
-                    color=c,
-                    s=50,
-                    zorder=2,
-                )
+            if _map["i"] and is_3d:
+                plot_angle(z_dir, h_dir, text=label_map["i"], radius=angle_radius, **akwargs)
 
-        if plot_velocity and ax.name != "3d":
-            orbit = self.at_theta(theta) if theta is not None else self
-            scaled_v = scale_vector(orbit.v_vec[:2], 0.5)
+            if _map["omega"] and not np.isclose(_self.omega, [0, np.pi]).any():
+                plot_angle(asc_node, r_p, text=label_map["omega"], radius=angle_radius, **akwargs)
 
-            with np.errstate(invalid="ignore", divide="ignore"):
-                scale = scaled_v / orbit.v_vec[:2]
-                scale = scale[np.isfinite(scale)][0]
+            if _map["Omega"] and not np.isclose(_self.Omega, [0, 2 * np.pi]).any():
+                ref_in_plane = rotate_vector(x_dir, asc_node, _self.i)
+                x_theta = angle_between(r_p, ref_in_plane)
+                x_dir = rotate_vector(_self.at_theta(x_theta).r_vec, asc_node, -_self.i)
+                plot_angle(x_dir, asc_node, text=label_map["Omega"], radius=angle_radius, **akwargs)
 
-            plot_vector(
-                scaled_v,
-                ax=ax,
-                annotations={"v": "v"},
-                origin=orbit.r_vec,
-            )
-            plot_vector(
-                orbit.vr * scale,
-                ax=ax,
-                origin=orbit.r_vec,
-                annotations={"v": "v_r"},
-            )
-            plot_vector(
-                orbit.vt * scale,
-                ax=ax,
-                origin=orbit.r_vec,
-                annotations={"v": r"v_\theta"},
-            )
+            if _map["x"] and not np.isclose(_self.Omega, [0, 2 * np.pi]).any():
+                plot_vector(x_dir, text=label_map["x"], **vkwargs)
+
+        if _map["theta"]:
+            plot_angle(r_p, r, text=label_map["theta"], radius=angle_radius, **akwargs)
+
+        if _map["r"]:
+            plot_vector(r, text=label_map["r"], **vkwargs)
+
+        if _map["r_a"]:
+            plot_vector(r_a, text=label_map["r_a"], **vkwargs)
+
+        if _map["r_p"]:
+            plot_vector(r_p, text=label_map["r_p"], **vkwargs)
+
+        if _map["z"] and is_3d:
+            plot_vector(z_dir, text=label_map["z"], **vkwargs)
+
+        if _map["h"] and is_3d:
+            plot_vector(h_dir, text=label_map["h"], **vkwargs)
+
+        scale = scale_vector(_self.v_vec, 0.3, ax=ax)
+
+        if _map["v_r"]:
+            key = "xyz" if is_3d else "xy"
+            value = (r + _self.vr * scale * 0.3)[: (3 if is_3d else 2)]
+            kw = {
+                **vkwargs,
+                "text_kwargs": {**vkwargs["text_kwargs"], key: value},
+            }
+            plot_vector(_self.vr * scale, origin=r, text=label_map["v_r"], **kw)
+
+        if _map["v_theta"]:
+            key = "xyz" if is_3d else "xy"
+            value = (r + _self.vt * scale * 0.5)[: (3 if is_3d else 2)]
+            kw = {
+                **vkwargs,
+                "text_kwargs": {**vkwargs["text_kwargs"], key: value},
+            }
+            plot_vector(_self.vt * scale, origin=r, text=label_map["v_theta"], **kw)
+
+        if _map["v"]:
+            plot_vector(_self.v_vec * scale, origin=r, text=label_map["v"], **vkwargs)
 
         plt.style.use(current_style)
 
@@ -832,7 +866,7 @@ class Orbit:
 
         a = (ra + rp) / 2
 
-        return Orbit([a, e, self.i, omega, self.Omega, theta_dep], mu=self.mu)
+        return Orbit([a, e, self.i, self.Omega, omega, theta_dep], mu=self.mu)
 
     def hohmann_transfer(self, orbit: Self) -> Self:
         """
@@ -914,7 +948,7 @@ class Orbit:
         cart = kep_to_cart(self.kep, self.mu)
         r = cart[..., :3]
         v = cart[..., 3:]
-        return np.cross(r, v, axisa=-1, axisb=-1, axisc=-1)
+        return np.cross(r, v, axis=-1)
 
     @property
     def e_vec(self) -> np.ndarray:
@@ -922,9 +956,9 @@ class Orbit:
         cart = kep_to_cart(self.kep, self.mu)
         r = cart[..., :3]
         v = cart[..., 3:]
-        return (
-            np.cross(v, self.h_vec, axisa=-1, axisb=-1, axisc=-1) / self.mu
-        ) - r / np.linalg.norm(r, axis=-1, keepdims=True)
+        return (np.cross(v, self.h_vec, axis=-1) / self.mu) - r / np.linalg.norm(
+            r, axis=-1, keepdims=True
+        )
 
     @property
     def h(self) -> float:
@@ -975,17 +1009,8 @@ class Orbit:
     @property
     def vt(self) -> float:
         "float : tangential velocity component"
-        a = np.pi / 2
-        R = np.array(
-            [
-                [np.cos(a), -np.sin(a), 0],
-                [np.sin(a), np.cos(a), 0],
-                [0, 0, 1],
-            ]
-        )
-
         ur = self.r_vec / self.r  # radial unit vector
-        ut = R @ ur  # tangential unit vector
+        ut = rotate_vector(ur, axis=self.h_vec, angle=np.pi / 2)  # tangential unit vector
         return self.mu / self.h * (1 + self.e * np.cos(self.theta)) * ut
 
     @property
