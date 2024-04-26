@@ -18,10 +18,25 @@ def test_circular(a, theta):
 def test_impulsive_shot(theta, dv, x):
     orbit = Orbit([2e6], mu=MU_EARTH)
     transfer = orbit.impulsive_shot(dv=dv, x=x, theta=theta)
-    # print(orbit)
-    # print(transfer)
-    # print(transfer.r_vec)
-    # print(orbit.at_theta(theta).r_vec)
-    res = np.mod(transfer.theta - transfer.omega + theta, np.pi)
-    print(np.isclose(res, 0) or np.isclose(res, np.pi))
+
     assert np.allclose(transfer.r_vec, orbit.at_theta(theta).r_vec)
+
+    v1 = orbit.at_theta(theta).v_vec
+    v2 = transfer.at_theta(transfer.theta).v_vec
+    assert np.isclose(np.linalg.norm(v2 - v1), dv)
+
+
+def test_hohmann():
+    pass
+
+
+def test_bielliptic():
+    pass
+
+
+def test_properties():
+    pass
+
+
+def test_time():
+    pass

@@ -47,18 +47,25 @@ class Orbit:
     ----------
     kep : np.ndarray
         keplerian elements: `[a, e, i, Ω, ω, θ]`
+
     mu : float
         gravitational parameter `μ`
+
     a : float
         semi-major axis in meters `a`. if `e=1`, `a` is instead taken as the orbital parameter `p`
+
     e : float
         eccentricity `e`
+
     i : float
         inclination `i`
+
     Omega : float
         longitude of the ascending node `Ω`
+
     omega : float
         argument of periapsis `ω`
+
     theta : float
         true anomaly `θ`
     """
@@ -85,6 +92,7 @@ class Orbit:
                     argument of periapsis
                 theta : float
                     true anomaly
+
         mu : float
             gravitational parameter
         """
@@ -180,11 +188,7 @@ class Orbit:
 
         return maybe_unwrap(orbital_velocity(self.h, self.mu, self.e, theta))
 
-    def trajectory(
-        self,
-        thetas: ArrayLike = None,
-        include_velocity=False,
-    ) -> np.ndarray:
+    def trajectory(self, thetas: ArrayLike = None, include_velocity=False) -> np.ndarray:
         """
         Calculate cartesian state vectors of the trajectory along the given thetas (true anomalies).
 
@@ -192,6 +196,7 @@ class Orbit:
         ----------
         thetas : array_like, optional
             true anomalies for which to return the positions. defaults to 1000 points on [0, 2π]
+
         include_velocity : bool, optional
             whether to include velocity in the return value
 
@@ -210,6 +215,7 @@ class Orbit:
                 thetas = np.linspace(-theta_asymptote, theta_asymptote, 1000)[1:-1]
         else:
             thetas = np.asarray(thetas, dtype=np.float64).reshape(-1)
+
         kep = np.repeat(self.kep.reshape((1, -1)), thetas.size, axis=0)
         kep[:, 5] = thetas.ravel()
         cart = kep_to_cart(kep, self.mu).reshape((-1, 6))
@@ -221,6 +227,8 @@ class Orbit:
 
     def intersects(self, orbit: Self) -> tuple[np.ndarray, np.ndarray] | Literal[False]:
         # TODO: implement this method
+        raise NotImplementedError()
+
         if self.type not in ["circular", "elliptic"] or orbit.type not in [
             "circular",
             "elliptic",
@@ -318,6 +326,7 @@ class Orbit:
         ----------
         t : float
             time at which to calculate the orbital position
+
         tau : float, optional
             epoch of periapsis passage (`tau = 0.0` by default)
 
@@ -347,6 +356,17 @@ class Orbit:
         return self.at_theta(theta)
 
     def with_inclination(self, i: float) -> Self:
+        """
+        Parameters
+        ----------
+        i : float
+            inclination
+
+        Returns
+        -------
+        Orbit
+            the orbit with the given inclination
+        """
         return Orbit([*self.kep[:2], i, *self.kep[3:]], mu=self.mu)
 
     def time_since(self, tau: float = 0.0) -> float:
@@ -386,9 +406,9 @@ class Orbit:
         theta: float = None,
         thetas: ArrayLike = None,
         ax: plt.Axes = None,
-        labels=None,
-        show=[],
-        rc={},
+        show: list[str] = [],
+        labels: dict[str, str] = None,
+        rc: dict = {},
         **kwargs,
     ) -> None:
         """
@@ -398,16 +418,28 @@ class Orbit:
         ----------
         theta : float, optional
             true anomaly at which to plot the position
+
         thetas : array_like, optional
             true anomalies for which to plot the orbit. if `None`, defaults to [0, 2π]
+
         ax : plt.Axes, optional
             axis to plot on. if `None`, creates a new figure
-        plot_elements : bool, optional
-            whether to plot the eccentricity and inclination vectors
-        plot_foci : bool, optional
-            whether to plot the foci of the ellipse
+
+        show : list, optional
+            elements to show on the plot. possible values are:
+            - "all"
+            - "angles"
+            - "vectors"
+            - "i", "omega", "Omega", "theta", "r", "r_p", "r_a", "n", "x", "z", "h", "v", "v_r", "v_theta"
+
+        labels : dict, optional
+            custom labels for the plotted elements given by `show`. keys are the same as `show`,
+            with values being the custom labels. if `None`, defaults to the standard labels,
+            if an empty dict, will plot no labels.
+
         rc : dict, optional
             matplotlib rc parameters
+
         kwargs : dict, optional
             additional keyword arguments to pass to the main `plt.plot` call responsible
             for plotting the orbit
@@ -540,13 +572,12 @@ class Orbit:
             label_map.update(labels or {})
 
         angle_radius = np.min([_self.rp * 0.6, np.mean([_self.rp, _self.ra]) / 3.5])
-        vector_norm = np.mean([_self.rp, _self.ra]) / 1.5
+        vector_norm = np.mean([_self.rp, np.nan_to_num(_self.ra, posinf=_self.rp)]) / 1.5
         vkwargs = dict(arrow_kwargs=dict(zorder=zorder + 1), text_kwargs=dict(zorder=zorder + 3))
         akwargs = dict(angle_kwargs=dict(zorder=zorder + 2), text_kwargs=dict(zorder=zorder + 4))
 
         r = _self.r_vec
         r_p = _self.at_theta(0).r_vec
-        r_a = _self.at_theta(np.pi).r_vec
         h_dir = (self.h_vec / self.h) * vector_norm
         x_dir = np.array([1, 0, 0]) * vector_norm
         z_dir = np.array([0, 0, 1]) * vector_norm
@@ -578,7 +609,8 @@ class Orbit:
         if _map["r"]:
             plot_vector(r, text=label_map["r"], **vkwargs)
 
-        if _map["r_a"]:
+        if _map["r_a"] and _self.type in ["circular", "elliptic"]:
+            r_a = _self.at_theta(np.pi).r_vec
             plot_vector(r_a, text=label_map["r_a"], **vkwargs)
 
         if _map["r_p"]:
@@ -623,6 +655,7 @@ class Orbit:
         ----------
         fig : go.FigureWidget, optional
             plotly FigureWidget to plot on. if `None`, creates a new figure
+
         kwargs : dict, optional
             additional keyword arguments to pass to ?
         """
@@ -630,12 +663,12 @@ class Orbit:
         import plotly.graph_objects as go
         from IPython.display import display
         from ipywidgets import (
+            interactive_output,
             FloatSlider,
             GridBox,
             IntSlider,
             Label,
             Layout,
-            interactive_output,
         )
 
         colors = [
@@ -799,12 +832,31 @@ class Orbit:
         display(ui, fig)
 
     # Transfer methods
-    def impulsive_shot(
-        self,
-        dv: float | ArrayLike,
-        x: float = None,
-        theta: float = None,
-    ) -> Self:
+    def impulsive_shot(self, dv: float | ArrayLike, x: float = None, theta: float = None) -> Self:
+        """
+        Perform an impulsive shot maneuver. This is an idealized maneuver where the delta-v is applied instantaneously.
+
+        Parameters
+        ----------
+        dv : float or array_like
+            delta-v vector. if a scalar, `x` must be provided
+
+        x : float, optional
+            angle the delta-v vector makes with the current velocity vector. if `None`, `dv` is assumed to be a 3d vector
+
+        theta : float, optional
+            true anomaly at which to perform the maneuver. if `None`, uses the current value of `self.theta`
+
+        Returns
+        -------
+        Orbit
+            the orbit after the impulsive shot
+
+        Raises
+        ------
+        AssertionError
+            if `dv` is a scalar and `x` is not provided
+        """
         if theta is None:
             theta = self.theta
 
@@ -832,12 +884,26 @@ class Orbit:
 
         Parameters
         ----------
+        orbit : Orbit
+            orbit to transfer to
+
+        theta_dep : float
+            true anomaly at which to depart
+
+        theta_arr : float
+            true anomaly at which to arrive (measured in our current orbit)
 
         Returns
         -------
+        Orbit
+            the transfer ellipse
 
         Raises
         ------
+        Exception
+            if the orbits are not coplanar, or not either circular or elliptic,
+            or if the gravitational parameters are not equal
+
         """
         if not self.is_coplanar_with(orbit):
             raise Exception("Orbits are not coplanar")
@@ -870,6 +936,9 @@ class Orbit:
 
     def hohmann_transfer(self, orbit: Self) -> Self:
         """
+        Perform a Hohmann transfer maneuver. This is a two-impulse transfer between two coplanar circular (or elliptic) orbits.
+        The departure is at periapsis, and arrival is at apoapsis: this is inverted if transferring to a smaller orbit.
+
         Parameters
         ----------
         orbit : Orbit
@@ -896,8 +965,16 @@ class Orbit:
 
     def bielliptic_transfer(self, orbit: Self, ra: float) -> tuple[Self, Self]:
         """
+        Perform a bielliptic transfer maneuver. This is a three-impulse transfer between two coplanar circular (or elliptic) orbits.
+
         Parameters
         ----------
+        orbit : Orbit
+            orbit to transfer to
+
+        ra : float
+            apoapsis distance of the transfer orbit. this should be larger than both orbits' apoapses (ideally *much* larger
+            for it to be an efficient transfer)
 
         Returns
         -------
@@ -978,6 +1055,9 @@ class Orbit:
     @property
     def ra(self) -> float:
         "float : apoapsis distance"
+        if self.type == "parabolic":
+            return np.inf
+
         return self.p / (1 - self.e)
 
     @property
@@ -1096,6 +1176,3 @@ class Orbit:
     @theta.setter
     def theta(self, value: float) -> None:
         self.kep[5] = value
-
-
-# %%

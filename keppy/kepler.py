@@ -8,7 +8,7 @@ def kep_to_cart(kep: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     Parameters
     ----------
     kep : array_like
-        keplerian elements: [a, e, i, ω, Ω, θ]
+        keplerian elements: [a, e, i, Ω, ω, θ]
     mu : float, array_like
         gravitational parameter. either a single float or an array_like with the same length as kep
 
@@ -20,6 +20,7 @@ def kep_to_cart(kep: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     shape = np.shape(kep)
     kep = np.asarray(kep, dtype=np.float64).reshape((-1, 6))
     [a, e, i, Omega, omega, theta] = kep.T
+    eps = np.finfo(np.float64).eps
 
     if isinstance(mu, (int, float)):
         mu = np.full((kep.shape[0],), mu, dtype=np.float64)
@@ -27,11 +28,11 @@ def kep_to_cart(kep: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
         mu = np.asarray(mu, dtype=np.float64).ravel()
 
     # Step 1: orbital angular momentum
-    par = np.isclose(e, 1)
-    npar = ~par
     h = np.zeros_like(e)
+    par = np.isclose(e, 1, atol=eps)
     h[par] = np.sqrt(mu[par] * np.abs(a[par]))
-    h[npar] = np.sqrt(mu[npar] * a[npar] * (1 - e[npar] ** 2))
+    print(mu[~par], a[~par], e[~par] ** 2)
+    h[~par] = np.sqrt(mu[~par] * np.abs(a[~par] * (1 - e[~par] ** 2)))
 
     # Step 2: transform to perifocal frame (p, q, w)
     r_w = (h**2 / mu / (1 + e * np.cos(theta)))[:, None] * np.stack(
@@ -62,80 +63,73 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     Returns
     -------
     kep : np.ndarray
-        keplerian elements: `[a, e, i, ω, Ω, θ]`
+        keplerian elements: `[a, e, i, Ω, ω, θ]`
     """
     shape = np.shape(cart)
     cart = np.asarray(cart, dtype=np.float64).reshape((-1, 6))
+    eps = np.finfo(np.float64).eps
 
     if isinstance(mu, (int, float)):
         mu = np.full((cart.shape[0],), mu, dtype=np.float64)
     else:
         mu = np.asarray(mu, dtype=np.float64).ravel()
 
+    # Step 1: position and velocity vectors
     r_vec = cart[:, :3]
     v_vec = cart[:, 3:]
+    r = np.linalg.norm(r_vec, axis=-1)
 
-    # Step 1: position and velocity magnitudes
-    r = np.linalg.norm(r_vec, axis=-1, keepdims=True)
-    v = np.linalg.norm(v_vec, axis=-1, keepdims=True)
-    v_r = dot(r_vec / r, v_vec)
-    v_p = np.sqrt(v.squeeze() ** 2 - v_r**2)  # noqa: F841
-
-    # Step 2: orbital angular momentum
+    # Step 2: calculate angular momentum and semi-latus rectum (orbital parameter)
     h_vec = np.cross(r_vec, v_vec, axis=-1)
     h = np.linalg.norm(h_vec, axis=-1)
+    p = h**2 / mu
 
-    # Step 3: eccentricity
-    e_vec = np.cross(v_vec, h_vec, axis=-1) / mu[:, None] - r_vec / r
-    e = np.linalg.norm(e_vec, axis=-1)
-    circ = np.isclose(e, 0)
-
-    # Step 4: inclination
-    i = np.arccos(h_vec[:, -1] / h)
-    equi = np.isclose(i, 0)
-
-    # Step 5: right ascension of the ascending node
+    # Step 3: calculate ascending node
     K = np.array([0, 0, 1])
-    N_vec = np.cross(K, h_vec)
+    N_vec = np.cross(K, h_vec, axis=-1)
     N = np.linalg.norm(N_vec, axis=-1)
 
-    # If i == 0 or i == π, Omega is undefined: set to 0
-    with np.errstate(invalid="ignore"):
-        Omega = np.nan_to_num(np.arccos(N_vec[:, 0] / N), nan=0.0)
-        Omega[equi] = 0.0
+    # Step 4: eccentricity
+    e_vec = np.cross(v_vec, h_vec, axis=-1) / mu[:, None] - r_vec / r[:, None]
+    e = np.linalg.norm(e_vec, axis=-1)
+    par = np.abs(e - 1.0) < eps
+    circ = np.abs(e) < eps
 
-    Omega = np.mod(Omega, 2 * np.pi)
+    # Step 5: semi-major axis
+    a = np.zeros_like(p)
+    a[par] = p
+    a[~par] = p[~par] / (1 - e[~par] ** 2)
+
+    # Step 6: inclination
+    i = np.arccos(h_vec[:, -1] / h)
+    equa = np.abs(i) < eps
+    N_vec[equa] = np.array([1, 0, 0])
+    N[equa] = 1.0
+
+    # Step 7: right ascension of the ascending node
+    Omega = np.arccos(N_vec[:, 0] / N)
     Omega[N_vec[:, 1] < 0] = 2 * np.pi - Omega[N_vec[:, 1] < 0]
 
-    # Step 6: argument of periapsis
-    pro = e_vec[:, -1] >= 0
-    retro = ~pro
+    # Step 8: argument of periapsis
+    omega = np.zeros_like(e)
+    omega[circ] = 0.0
+    omega[~circ] = np.arccos(
+        np.clip(dot(e_vec[~circ] / e[~circ, None], N_vec[~circ] / N[~circ, None]), -1, 1)
+    )
+    iy = ~circ & equa & (N_vec[~circ & equa, 1] < 0)
+    iz = ~circ & ~equa & (N_vec[~circ & ~equa, 2] < 0)
+    omega[iy | iz] = 2 * np.pi - omega[iy | iz]
 
-    # If i == 0 or i == π, omega is undefined: set to 2d case
-    with np.errstate(invalid="ignore"):
-        omega = np.nan_to_num(np.arccos(dot(N_vec, e_vec) / (N * e)), nan=0.0)
-    omega[equi & circ] = 0.0  # could also set to π
-    omega[equi & ~circ] = np.arctan2(e_vec[equi & ~circ, 1], e_vec[equi & ~circ, 0])
-
-    omega = np.mod(omega, 2 * np.pi)
-    omega[retro] = 2 * np.pi - omega[retro]
-
-    # Step 7: true anomaly
-    away = v_r >= 0
-    towards = ~away
-
-    with np.errstate(invalid="ignore"):
-        theta = np.nan_to_num(np.arccos(dot(r_vec / r, e_vec / e[:, None])), nan=0.0)
-
-    theta = np.mod(theta, 2 * np.pi)
-    theta[towards] = 2 * np.pi - theta[towards]
-
-    # Step 8: semi-major axis
-    par = np.isclose(e, 1)
-    npar = ~par
-    a = np.zeros_like(e)
-    a[par] = h[par] ** 2 / mu[par]  # p = a if parabolic
-    a[npar] = (h[npar] ** 2 / mu[npar]) / (1 - e[npar] ** 2)
+    # Step 9: true anomaly
+    e_vec[circ] = N_vec[circ]
+    theta = np.arccos(
+        np.clip(dot(r_vec / r[:, None], e_vec / np.linalg.norm(e_vec, axis=-1)), -1, 1)
+    )
+    ii = np.isclose(N_vec, [1, 0, 0], atol=eps).all(axis=-1)
+    iy = circ & ii & (r_vec[:, 1] < 0)
+    iz = circ & ~ii & (r_vec[:, 2] < 0)
+    ih = ~circ & (h_vec[:, 2] < 0)
+    theta[iy | iz | ih] = 2 * np.pi - theta[iy | iz | ih]
 
     kep = np.stack([a, e, i, Omega, omega, theta], axis=-1)
     return kep.reshape(shape)
