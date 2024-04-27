@@ -26,8 +26,20 @@ ts = np.array([0, 0.5, 1, 1.5, 2]) * np.pi
 mus = [MU_EARTH]
 
 
+def filter_orbit(kep) -> bool:
+    [a, e, i, Omega, omega, theta, mu] = kep
+
+    if e == 1 and theta == np.pi:
+        return False
+
+    return True
+
+
+orbit_params = filter(filter_orbit, product(as_, es, is_, Os, os, ts, mus))
+
+
 # Orbit
-@pytest.fixture(params=product(as_, es, is_, Os, os, ts, mus))
+@pytest.fixture(params=orbit_params)
 def orbit(request):
     return Orbit(request.param[:-1], mu=request.param[-1])
 

@@ -31,7 +31,6 @@ def kep_to_cart(kep: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     h = np.zeros_like(e)
     par = np.isclose(e, 1, atol=eps)
     h[par] = np.sqrt(mu[par] * np.abs(a[par]))
-    print(mu[~par], a[~par], e[~par] ** 2)
     h[~par] = np.sqrt(mu[~par] * np.abs(a[~par] * (1 - e[~par] ** 2)))
 
     # Step 2: transform to perifocal frame (p, q, w)
@@ -67,7 +66,7 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     """
     shape = np.shape(cart)
     cart = np.asarray(cart, dtype=np.float64).reshape((-1, 6))
-    eps = np.finfo(np.float64).eps
+    eps = 20 * np.finfo(np.float64).eps
 
     if isinstance(mu, (int, float)):
         mu = np.full((cart.shape[0],), mu, dtype=np.float64)
@@ -102,13 +101,14 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
 
     # Step 6: inclination
     i = np.arccos(h_vec[:, -1] / h)
-    equa = np.abs(i) < eps
+    retro = i > (np.pi / 2)
+    equa = (np.abs(i) < eps) | (np.abs(i - np.pi) < eps)
     N_vec[equa] = np.array([1, 0, 0])
     N[equa] = 1.0
 
     # Step 7: right ascension of the ascending node
     Omega = np.arccos(N_vec[:, 0] / N)
-    Omega[N_vec[:, 1] < 0] = 2 * np.pi - Omega[N_vec[:, 1] < 0]
+    Omega[(N_vec[:, 1] / N) < 0] = 2 * np.pi - Omega[(N_vec[:, 1] / N) < 0]
 
     # Step 8: argument of periapsis
     omega = np.zeros_like(e)
@@ -116,19 +116,19 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
     omega[~circ] = np.arccos(
         np.clip(dot(e_vec[~circ] / e[~circ, None], N_vec[~circ] / N[~circ, None]), -1, 1)
     )
-    iy = ~circ & equa & (N_vec[~circ & equa, 1] < 0)
-    iz = ~circ & ~equa & (N_vec[~circ & ~equa, 2] < 0)
+    iy = ~circ & equa & ((~retro & (e_vec[:, 1] < 0)) | (retro & (e_vec[:, 1] >= 0)))
+    iz = ~circ & ~equa & ((~retro & (e_vec[:, 2] < 0)) | (retro & (e_vec[:, 2] >= 0)))
     omega[iy | iz] = 2 * np.pi - omega[iy | iz]
 
     # Step 9: true anomaly
-    e_vec[circ] = N_vec[circ]
+    e_vec[circ] = N_vec[circ] / N[circ, None]
     theta = np.arccos(
         np.clip(dot(r_vec / r[:, None], e_vec / np.linalg.norm(e_vec, axis=-1)), -1, 1)
     )
-    ii = np.isclose(N_vec, [1, 0, 0], atol=eps).all(axis=-1)
-    iy = circ & ii & (r_vec[:, 1] < 0)
-    iz = circ & ~ii & (r_vec[:, 2] < 0)
-    ih = ~circ & (h_vec[:, 2] < 0)
+
+    iy = circ & equa & ((~retro & (r_vec[:, 1] < 0)) | (retro & (r_vec[:, 1] >= 0)))
+    iz = circ & ~equa & ((~retro & (r_vec[:, 2] < 0)) | (retro & (r_vec[:, 2] >= 0)))
+    ih = ~circ & (dot(r_vec, v_vec) < 0)
     theta[iy | iz | ih] = 2 * np.pi - theta[iy | iz | ih]
 
     kep = np.stack([a, e, i, Omega, omega, theta], axis=-1)

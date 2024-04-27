@@ -6,6 +6,10 @@ from keppy.constants import MU_EARTH
 from keppy.orbit import Orbit
 
 
+def test_orbit():
+    pass
+
+
 def test_circular(a, theta):
     orbit = Orbit([a, 0], mu=MU_EARTH)
     assert np.isclose(orbit.orbital_distance(theta), a)
