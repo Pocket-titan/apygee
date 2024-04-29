@@ -25,6 +25,7 @@ from keppy.kepler import (
     orbital_plane,
     orbital_velocity,
     t_from_M,
+    t_from_M_parabolic,
     theta_from_E,
     theta_from_F,
 )
@@ -337,7 +338,7 @@ class Orbit:
         """
         if self.type == "circular":
             angular_velocity = np.sqrt(self.mu / self.a**3)
-            return self.at_theta(self.theta + angular_velocity * t)
+            return self.at_theta(angular_velocity * t)
 
         n = self.mean_motion
         M = mean_anomaly(n, t, tau)
@@ -392,9 +393,18 @@ class Orbit:
             M = M_from_E(E, self.e)
 
         if self.type == "parabolic":
+            if np.isclose(np.mod(self.theta, 2 * np.pi), [-np.pi, np.pi]).any():
+                return np.inf
+
             M = inverse_barkers_equation(self.theta)
+            return t_from_M_parabolic(M, self.h, self.mu, tau)
 
         if self.type == "hyperbolic":
+            theta_asymptote = np.arccos(-1 / self.e)
+
+            if self.theta <= -theta_asymptote or self.theta >= theta_asymptote:
+                return np.nan
+
             F = F_from_theta(self.theta, self.e)
             M = M_from_F(F, self.e)
 
@@ -406,7 +416,7 @@ class Orbit:
         theta: float = None,
         thetas: ArrayLike = None,
         ax: plt.Axes = None,
-        show: list[str] = [],
+        show: list[str] = None,
         labels: dict[str, str] = None,
         rc: dict = {},
         **kwargs,
@@ -489,10 +499,12 @@ class Orbit:
         else:
             zorder = 2
 
+        if show is None:
+            show = []
         if isinstance(show, str):
             show = [show]
         if theta is not None:
-            show = [*(show or []), "r"]
+            show = [*show, "r"]
         if not show:
             return
 
@@ -1102,6 +1114,11 @@ class Orbit:
             return np.sqrt(16 / 9 * self.p**3 / self.mu)
 
         return np.inf
+
+    @property
+    def t(self) -> float:
+        "float : time since periapsis passage"
+        return self.time_since(0)
 
     @property
     def gamma(self) -> float:

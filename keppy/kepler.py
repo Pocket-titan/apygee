@@ -96,7 +96,7 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
 
     # Step 5: semi-major axis
     a = np.zeros_like(p)
-    a[par] = p
+    a[par] = p[par]
     a[~par] = p[~par] / (1 - e[~par] ** 2)
 
     # Step 6: inclination
@@ -117,14 +117,14 @@ def cart_to_kep(cart: ArrayLike, mu: float | ArrayLike) -> np.ndarray:
         np.clip(dot(e_vec[~circ] / e[~circ, None], N_vec[~circ] / N[~circ, None]), -1, 1)
     )
     iy = ~circ & equa & ((~retro & (e_vec[:, 1] < 0)) | (retro & (e_vec[:, 1] >= 0)))
-    iz = ~circ & ~equa & ((~retro & (e_vec[:, 2] < 0)) | (retro & (e_vec[:, 2] >= 0)))
+    iz = ~circ & ~equa & (e_vec[:, 2] < 0)
     omega[iy | iz] = 2 * np.pi - omega[iy | iz]
 
     # Step 9: true anomaly
     e_vec[circ] = N_vec[circ] / N[circ, None]
     theta = np.arccos(
         np.clip(dot(r_vec / r[:, None], e_vec / np.linalg.norm(e_vec, axis=-1)), -1, 1)
-    )
+    )  # important to recalculate the norm of e_vec here, because we have just changed it (for circular orbits)
 
     iy = circ & equa & ((~retro & (r_vec[:, 1] < 0)) | (retro & (r_vec[:, 1] >= 0)))
     iz = circ & ~equa & ((~retro & (r_vec[:, 2] < 0)) | (retro & (r_vec[:, 2] >= 0)))
@@ -325,6 +325,10 @@ def M_from_F(F: float, e: float) -> float:
 def t_from_M(M: float, n: float, tau: float = 0.0) -> float:
     t = M / n + tau
     return t
+
+
+def t_from_M_parabolic(M: float, h: float, mu: float, tau: float = 0.0) -> float:
+    return M * (h**3) / (mu**2) + tau
 
 
 def sphere_of_influence(a: float, m: float, M: float) -> float:
