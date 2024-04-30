@@ -1,10 +1,6 @@
 # %%
 import numpy as np
 from keppy.orbit import Orbit
-from keppy.plot import AngleAnnotation
-from keppy.kepler import angle_between, kep_to_cart, cart_to_kep, euler_rotation_matrix
-from keppy.utils import rotate_vector, scale_vector
-from keppy.plot import plot_vector, plot_angle
 from keppy.constants import (
     MERCURY,
     VENUS,

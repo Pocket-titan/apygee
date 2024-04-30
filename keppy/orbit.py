@@ -1,4 +1,3 @@
-# %%
 from typing import Literal, Self
 from numpy.typing import ArrayLike
 
@@ -30,8 +29,11 @@ from keppy.kepler import (
     theta_from_F,
 )
 from keppy.utils import (
+    darken,
     deep_diff,
+    deep_update,
     flatten,
+    lighten,
     omit,
     scale_vector,
     rotate_vector,
@@ -419,6 +421,8 @@ class Orbit:
         show: list[str] = None,
         labels: dict[str, str] = None,
         rc: dict = {},
+        arrow_kwargs: dict = {},
+        angle_kwargs: dict = {},
         **kwargs,
     ) -> None:
         """
@@ -480,10 +484,22 @@ class Orbit:
 
         if is_3d:
             ax.computed_zorder = False
+            ax.set_facecolor("white")
+            facecolor = (
+                own_style.get("axes.facecolor")
+                or rc.get("axes.facecolor")
+                or plt.rcParams["axes.facecolor"]
+            )
+
+            if facecolor is not None:
+                ax.xaxis.set_pane_color(lighten(facecolor, 0.05))
+                ax.zaxis.set_pane_color(facecolor)
+                ax.yaxis.set_pane_color(darken(facecolor, 0.05))
+
         elif not np.isclose(self.i, [0, np.pi]).any():
             _self = _self.with_inclination(0)
 
-        _self = _self.at_theta(theta or self.theta)
+        _self = _self.at_theta(theta if theta is not None else self.theta)
 
         if thetas is None or np.size(thetas) > 0:
             cart = _self.trajectory(thetas)
@@ -503,9 +519,8 @@ class Orbit:
             show = []
         if isinstance(show, str):
             show = [show]
-        if theta is not None:
-            show = [*show, "r"]
         if not show:
+            plt.style.use(current_style)
             return
 
         keys = [
@@ -585,8 +600,14 @@ class Orbit:
 
         angle_radius = np.min([_self.rp * 0.6, np.mean([_self.rp, _self.ra]) / 3.5])
         vector_norm = np.mean([_self.rp, np.nan_to_num(_self.ra, posinf=_self.rp)]) / 1.5
-        vkwargs = dict(arrow_kwargs=dict(zorder=zorder + 1), text_kwargs=dict(zorder=zorder + 3))
-        akwargs = dict(angle_kwargs=dict(zorder=zorder + 2), text_kwargs=dict(zorder=zorder + 4))
+        vkwargs = dict(
+            arrow_kwargs=dict(zorder=zorder + 1 * 0.2), text_kwargs=dict(zorder=zorder + 3 * 0.2)
+        )
+        deep_update(vkwargs, dict(arrow_kwargs=arrow_kwargs))
+        akwargs = dict(
+            angle_kwargs=dict(zorder=zorder + 2 * 0.2), text_kwargs=dict(zorder=zorder + 4 * 0.2)
+        )
+        deep_update(akwargs, dict(angle_kwargs=angle_kwargs))
 
         r = _self.r_vec
         r_p = _self.at_theta(0).r_vec
@@ -990,16 +1011,15 @@ class Orbit:
 
         Returns
         -------
-
-        Raises
-        ------
+        tuple[Orbit, Orbit]
+            the two transfer ellipses
 
         See Also
         --------
         hohmann_transfer
         """
-        assert orbit.a > self.a, "Orbit must be transferring from inner to outer orbit"
-        assert ra > orbit.ra > self.ra, "`ra` must be larger than both orbits' apoapses"
+        assert orbit.a >= self.a, "Orbit must be transferring from inner to outer orbit"
+        assert ra >= orbit.ra >= self.ra, "`ra` must be larger than both orbits' apoapses"
 
         rp = self.rp
         a = (rp + ra) / 2

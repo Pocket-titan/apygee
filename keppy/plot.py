@@ -1,4 +1,3 @@
-# %%
 from matplotlib.colors import to_rgba
 from numpy.typing import ArrayLike
 
@@ -71,6 +70,8 @@ def plot_vector_2d(
     if color is None:
         color = _color
 
+    arrow_kwargs = {**arrow_kwargs}
+    zorder = arrow_kwargs.pop("zorder", None)
     arrowprops = {"width": 1.5, "headwidth": 9, "headlength": 9, **arrow_kwargs}
 
     if plot_components:
@@ -80,6 +81,7 @@ def plot_vector_2d(
             xytext=origin,
             xycoords="data",
             arrowprops={**arrowprops, "color": "#E66B4C"},
+            zorder=zorder,
         )
         ax.annotate(
             "",
@@ -87,9 +89,22 @@ def plot_vector_2d(
             xytext=origin,
             xycoords="data",
             arrowprops={**arrowprops, "color": "#A4E64B"},
+            zorder=zorder,
         )
-        ax.plot(*np.stack([origin + [v[0], 0], origin + v]).T, lw=2, ls="--", color="0.7")
-        ax.plot(*np.stack([origin + [0, v[1]], origin + v]).T, lw=2, ls="--", color="0.7")
+        ax.plot(
+            *np.stack([origin + [v[0], 0], origin + v]).T,
+            lw=2,
+            ls="--",
+            color="0.7",
+            zorder=zorder,
+        )
+        ax.plot(
+            *np.stack([origin + [0, v[1]], origin + v]).T,
+            lw=2,
+            ls="--",
+            color="0.7",
+            zorder=zorder,
+        )
 
     # Plot main vector after to ensure it's on top
     ax.annotate(
@@ -98,6 +113,7 @@ def plot_vector_2d(
         xytext=origin,
         xycoords="data",
         arrowprops={**arrowprops, "color": color},
+        zorder=zorder,
     )
 
     if text is None:
@@ -181,11 +197,11 @@ def plot_vector_3d(
 
     # Plot main vector after to ensure it's on top
     _arrow = arrow3D(
-        origin + v,
+        v,
         origin,
         ax=ax,
         text=vtext,
-        xyztext=text_kwargs.pop("xyz", origin + v / 2),
+        xyztext=text_kwargs.pop("xyz", origin + v * 0.4),
         arrow_kwargs=arrowprops,
         text_kwargs=text_kwargs,
     )
@@ -603,9 +619,9 @@ def arrow3D(
     ax.add_artist(arrow)
 
     if xyztext is None:
-        xyztext = np.array(origin) + np.array(v) / 2
+        xyztext = np.array(origin) + np.array(v) * 0.4
     if text is not None:
-        bg = ax.get_facecolor()
+        bg = ax.zaxis.pane.get_facecolor() or "none"
 
         textprops = {
             "ha": "center",
@@ -619,6 +635,3 @@ def arrow3D(
         ax.text(*xyztext, text, **textprops)
 
     return arrow
-
-
-# %%

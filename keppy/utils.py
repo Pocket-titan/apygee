@@ -45,6 +45,16 @@ def deep_diff(a: dict, b: dict) -> dict:
     return diff
 
 
+def deep_update(a: dict, b: dict) -> None:
+    for key in b:
+        if key not in a:
+            a[key] = b[key]
+        elif isinstance(a[key], dict) and isinstance(b[key], dict):
+            deep_update(a[key], b[key])
+        else:
+            a[key] = b[key]
+
+
 def is_iterable(x) -> bool:
     try:
         iter(x)

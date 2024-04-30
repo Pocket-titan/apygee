@@ -6,6 +6,7 @@
 # [5] https://www.iau.org/static/resolutions/IAU2012_English.pdf
 # [6] de Pater, I., & Lissauer, J. J. (2015). Planetary Sciences (2nd ed.). Cambridge: Cambridge University Press.
 # [7] https://ssd.jpl.nasa.gov/horizons/app.html#/
+
 from keppy.orbit import Orbit
 import numpy as np
 
@@ -25,9 +26,7 @@ E_MERCURY = 0.20563175  # [6]
 I_MERCURY = np.deg2rad(7.00499)  # [rad] [6]
 OMEGA_MERCURY = np.deg2rad(48.3309)  # [rad] [6]
 LOMEGA_MERCURY = np.deg2rad(77.4561)  # [rad] [6]
-MERCURY = Orbit(
-    [A_MERCURY, E_MERCURY, I_MERCURY, LOMEGA_MERCURY, OMEGA_MERCURY], mu=MU_SUN
-)
+MERCURY = Orbit([A_MERCURY, E_MERCURY, I_MERCURY, LOMEGA_MERCURY, OMEGA_MERCURY], mu=MU_SUN)
 
 M_VENUS = 4.86731e24  # [kg] [2]
 R_VENUS = 6051.8e3  # [m] [2]
@@ -77,9 +76,7 @@ E_JUPITER = 0.048495  # [6]
 I_JUPITER = np.deg2rad(1.3033)  # [6]
 OMEGA_JUPITER = np.deg2rad(100.464)  # [6]
 LOMEGA_JUPITER = np.deg2rad(14.331)  # [6]
-JUPITER = Orbit(
-    [A_JUPITER, E_JUPITER, I_JUPITER, LOMEGA_JUPITER, OMEGA_JUPITER], mu=MU_SUN
-)
+JUPITER = Orbit([A_JUPITER, E_JUPITER, I_JUPITER, LOMEGA_JUPITER, OMEGA_JUPITER], mu=MU_SUN)
 
 M_SATURN = 568.317e24  # [kg] [2]
 R_SATURN = 58232e3  # [m] [2]
@@ -109,6 +106,4 @@ E_NEPTUNE = 0.00899  # [6]
 I_NEPTUNE = np.deg2rad(1.770)  # [6]
 OMEGA_NEPTUNE = np.deg2rad(131.78)  # [6]
 LOMEGA_NEPTUNE = np.deg2rad(48.12)  # [6]
-NEPTUNE = Orbit(
-    [A_NEPTUNE, E_NEPTUNE, I_NEPTUNE, LOMEGA_NEPTUNE, OMEGA_NEPTUNE], mu=MU_SUN
-)
+NEPTUNE = Orbit([A_NEPTUNE, E_NEPTUNE, I_NEPTUNE, LOMEGA_NEPTUNE, OMEGA_NEPTUNE], mu=MU_SUN)
