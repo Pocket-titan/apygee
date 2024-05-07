@@ -150,6 +150,18 @@ def rotate_vector(v: ArrayLike, axis: ArrayLike, angle: float):
     return np.tensordot(v, R, axes=(-1, -1))
 
 
+def dot(a: ArrayLike, b: ArrayLike) -> np.ndarray:
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    return np.sum(a * b, axis=-1)
+
+
+def angle_between(a: ArrayLike, b: ArrayLike) -> float:
+    a = np.asarray(a, dtype=np.float64)
+    b = np.asarray(b, dtype=np.float64)
+    return np.arccos(np.clip(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)), -1, 1))
+
+
 def mix_colors(
     color1: str | tuple[float],
     color2: str | tuple[float],

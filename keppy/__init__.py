@@ -1,4 +1,4 @@
-from keppy.kepler import cart_to_kep, kep_to_cart, sphere_of_influence, angle_between
+from keppy.kepler import cart_to_kep, kep_to_cart, sphere_of_influence
 from keppy.constants import (
     MU_SUN,
     MU_MERCURY,
@@ -26,4 +26,4 @@ from keppy.plot import (
     plot_vector_2d,
     plot_vector_3d,
 )
-from keppy.utils import rotate_vector, scale_vector
+from keppy.utils import angle_between, rotate_vector, scale_vector

@@ -1,5 +1,6 @@
 from numpy.typing import ArrayLike
 
+from keppy.utils import dot
 import numpy as np
 
 
@@ -350,13 +351,4 @@ def sphere_of_influence(a: float, m: float, M: float) -> float:
     return a * (m / M) ** (2 / 5)
 
 
-def dot(a: ArrayLike, b: ArrayLike) -> np.ndarray:
-    a = np.asarray(a, dtype=np.float64)
-    b = np.asarray(b, dtype=np.float64)
-    return np.sum(a * b, axis=-1)
 
-
-def angle_between(a: ArrayLike, b: ArrayLike) -> float:
-    a = np.asarray(a, dtype=np.float64)
-    b = np.asarray(b, dtype=np.float64)
-    return np.arccos(np.clip(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)), -1, 1))

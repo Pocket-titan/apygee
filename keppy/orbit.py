@@ -6,7 +6,6 @@ import numpy as np
 
 from keppy.plot import plot_vector, plot_angle
 from keppy.kepler import (
-    angle_between,
     E_from_theta,
     F_from_theta,
     M_from_E,
@@ -29,6 +28,7 @@ from keppy.kepler import (
     theta_from_F,
 )
 from keppy.utils import (
+    angle_between,
     darken,
     deep_diff,
     deep_update,
