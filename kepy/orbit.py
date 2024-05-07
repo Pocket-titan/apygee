@@ -4,8 +4,8 @@ from numpy.typing import ArrayLike
 import matplotlib.pyplot as plt
 import numpy as np
 
-from keppy.plot import plot_vector, plot_angle
-from keppy.kepler import (
+from kepy.plot import plot_vector, plot_angle
+from kepy.kepler import (
     E_from_theta,
     F_from_theta,
     M_from_E,
@@ -27,7 +27,7 @@ from keppy.kepler import (
     theta_from_E,
     theta_from_F,
 )
-from keppy.utils import (
+from kepy.utils import (
     angle_between,
     darken,
     deep_diff,
@@ -264,18 +264,28 @@ class Orbit:
         rm = (A - np.sqrt(Delta)) / B
 
         if not (
-            ((a1 * (1 - e1) <= rp <= a1 * (1 + e1)) or (a2 * (1 - e2) <= rp <= a2 * (1 + e2)))
-            and ((a1 * (1 - e1) <= rm <= a1 * (1 + e1)) or (a2 * (1 - e2) <= rm <= a2 * (1 + e2)))
+            (
+                (a1 * (1 - e1) <= rp <= a1 * (1 + e1))
+                or (a2 * (1 - e2) <= rp <= a2 * (1 + e2))
+            )
+            and (
+                (a1 * (1 - e1) <= rm <= a1 * (1 + e1))
+                or (a2 * (1 - e2) <= rm <= a2 * (1 + e2))
+            )
         ):
             return False
 
         cp = (a1 * (1 - e1**2) - rp) / (rp * e1)
-        sp = (a2 * (1 - e2**2) - rp) / (rp * e2) * (1 / np.sin(domega)) - cp * (1 / np.tan(domega))
+        sp = (a2 * (1 - e2**2) - rp) / (rp * e2) * (1 / np.sin(domega)) - cp * (
+            1 / np.tan(domega)
+        )
 
         print(np.sin(domega), np.tan(domega))
 
         cm = (a1 * (1 - e1**2) - rm) / (rm * e1)
-        sm = (a2 * (1 - e2**2) - rm) / (rm * e2) * (1 / np.sin(domega)) - cm * (1 / np.tan(domega))
+        sm = (a2 * (1 - e2**2) - rm) / (rm * e2) * (1 / np.sin(domega)) - cm * (
+            1 / np.tan(domega)
+        )
 
         return (rp * np.array([cp, sp, 0]), rp * np.array([cm, sm, 0]))
 
@@ -601,11 +611,13 @@ class Orbit:
         angle_radius = np.min([_self.rp * 0.6, np.mean([_self.rp, _self.ra]) / 3.5])
         vector_norm = np.mean([_self.rp, np.nan_to_num(_self.ra, posinf=_self.rp)]) / 1.5
         vkwargs = dict(
-            arrow_kwargs=dict(zorder=zorder + 1 * 0.2), text_kwargs=dict(zorder=zorder + 3 * 0.2)
+            arrow_kwargs=dict(zorder=zorder + 1 * 0.2),
+            text_kwargs=dict(zorder=zorder + 3 * 0.2),
         )
         deep_update(vkwargs, dict(arrow_kwargs=arrow_kwargs))
         akwargs = dict(
-            angle_kwargs=dict(zorder=zorder + 2 * 0.2), text_kwargs=dict(zorder=zorder + 4 * 0.2)
+            angle_kwargs=dict(zorder=zorder + 2 * 0.2),
+            text_kwargs=dict(zorder=zorder + 4 * 0.2),
         )
         deep_update(akwargs, dict(angle_kwargs=angle_kwargs))
 
@@ -622,16 +634,26 @@ class Orbit:
                 plot_vector(asc_node, text=label_map["n"], **vkwargs)
 
             if _map["i"] and is_3d:
-                plot_angle(z_dir, h_dir, text=label_map["i"], radius=angle_radius, **akwargs)
+                plot_angle(
+                    z_dir, h_dir, text=label_map["i"], radius=angle_radius, **akwargs
+                )
 
             if _map["omega"] and not np.isclose(_self.omega, [0, np.pi]).any():
-                plot_angle(asc_node, r_p, text=label_map["omega"], radius=angle_radius, **akwargs)
+                plot_angle(
+                    asc_node, r_p, text=label_map["omega"], radius=angle_radius, **akwargs
+                )
 
             if _map["Omega"] and not np.isclose(_self.Omega, [0, 2 * np.pi]).any():
                 ref_in_plane = rotate_vector(x_dir, asc_node, _self.i)
                 x_theta = angle_between(r_p, ref_in_plane)
                 x_dir = rotate_vector(_self.at_theta(x_theta).r_vec, asc_node, -_self.i)
-                plot_angle(x_dir, asc_node, text=label_map["Omega"], radius=angle_radius, **akwargs)
+                plot_angle(
+                    x_dir,
+                    asc_node,
+                    text=label_map["Omega"],
+                    radius=angle_radius,
+                    **akwargs,
+                )
 
             if _map["x"] and not np.isclose(_self.Omega, [0, 2 * np.pi]).any():
                 plot_vector(x_dir, text=label_map["x"], **vkwargs)
@@ -865,7 +887,9 @@ class Orbit:
         display(ui, fig)
 
     # Transfer methods
-    def impulsive_shot(self, dv: float | ArrayLike, x: float = None, theta: float = None) -> Self:
+    def impulsive_shot(
+        self, dv: float | ArrayLike, x: float = None, theta: float = None
+    ) -> Self:
         """
         Perform an impulsive shot maneuver. This is an idealized maneuver where the delta-v is applied instantaneously.
 
@@ -907,7 +931,9 @@ class Orbit:
             assert dv.size == 3, "dv must be a 3d vector"
             v1 = v0 + dv
 
-        return Orbit.from_cart(np.concatenate([self.at_theta(theta).r_vec, v1]), mu=self.mu)
+        return Orbit.from_cart(
+            np.concatenate([self.at_theta(theta).r_vec, v1]), mu=self.mu
+        )
 
     def coplanar_transfer(self, orbit: Self, theta_dep: float, theta_arr: float) -> Self:
         """

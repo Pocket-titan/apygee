@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
-from keppy.constants import MU_EARTH
-from keppy.orbit import Orbit
+from kepy.constants import MU_EARTH
+from kepy.orbit import Orbit
 from itertools import product
 
 
@@ -31,11 +31,15 @@ def kep_isclose(kep1: np.array, kep2: np.array) -> bool:
             print(f"{i1 = }, {i2 = }")
             return False
 
-        if not np.isclose(np.mod(Omega1, 2 * np.pi), np.mod(Omega2, 2 * np.pi), atol=1e-9):
+        if not np.isclose(
+            np.mod(Omega1, 2 * np.pi), np.mod(Omega2, 2 * np.pi), atol=1e-9
+        ):
             print(f"{Omega1 = }, {Omega2 = }")
             return False
 
-        if not np.isclose(np.mod(omega1 + theta1, 2 * np.pi), np.mod(omega2 + theta2, 2 * np.pi)):
+        if not np.isclose(
+            np.mod(omega1 + theta1, 2 * np.pi), np.mod(omega2 + theta2, 2 * np.pi)
+        ):
             print(f"{omega1 = }, {omega2 = }")
             print(f"{theta1 = }, {theta2 = }")
             return False

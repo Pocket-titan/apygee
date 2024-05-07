@@ -1,4 +1,4 @@
-from keppy.kepler import cart_to_kep, kep_to_cart
+from kepy.kepler import cart_to_kep, kep_to_cart
 from .conftest import cart_isclose, kep_isclose
 
 

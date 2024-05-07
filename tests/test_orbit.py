@@ -2,12 +2,14 @@ import numpy as np
 import pytest
 
 from itertools import product
-from keppy.orbit import Orbit
+from kepy.orbit import Orbit
 
 
 def test_orbit(orbit):
     rv1 = np.concatenate([orbit.at_theta(0).r_vec, orbit.at_theta(0).v_vec])
-    rv2 = np.concatenate([orbit.at_theta(2 * np.pi).r_vec, orbit.at_theta(2 * np.pi).v_vec])
+    rv2 = np.concatenate(
+        [orbit.at_theta(2 * np.pi).r_vec, orbit.at_theta(2 * np.pi).v_vec]
+    )
     assert np.allclose(rv1, rv2, atol=1e-6)
 
 

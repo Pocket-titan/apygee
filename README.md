@@ -1,6 +1,15 @@
-# Kepy
+# KePy
 
-Kepy (pronounced kep-py) is a lightweight Python package for creating, manipulating and visualizing Kepler orbits.
+<p align="center">
+  <a href="https://github.com/Pocket-titan/kepy">
+    <img src="logo.jpg" alt="Logo" width="280">
+  </a>
+  <p align="center">
+    kepler orbits in Python
+  </p>
+</p>
+
+KePy (pronounced kep-py) is a lightweight Python package for creating, manipulating and visualizing Kepler orbits.
 
 ## Installation
 
@@ -15,9 +24,11 @@ The main export of Kepy is the `Orbit` class, which stores the keplerian element
 ```python
 from kepy import Orbit, MU_EARTH
 
-orbit = Orbit([2e6], mu=MU_EATH)
-print(orbit) # Orbit([a=2e+6, e=0, i=0, Ω=0, ω=0, θ=0], μ=3.99e+14, type='circular')
+orbit = Orbit([2e6], mu=MU_EARTH)
+print(orbit)
 ```
+
+    Orbit([a=2e+6, e=0, i=0, Ω=0, ω=0, θ=0], μ=3.99e+14, type='circular')
 
 ## Examples
 
@@ -30,3 +41,5 @@ Contributions are welcome! For bug reports or feature requests, please submit an
 ## Sources
 
 ## License
+
+This project is licensed under the terms of the MIT license.

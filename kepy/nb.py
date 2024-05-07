@@ -1,7 +1,7 @@
 # %%
 import numpy as np
-from keppy.orbit import Orbit
-from keppy.constants import (
+from kepy.orbit import Orbit
+from kepy.constants import (
     MERCURY,
     VENUS,
     EARTH,

@@ -1,6 +1,6 @@
 from numpy.typing import ArrayLike
 
-from keppy.utils import dot
+from kepy.utils import dot
 import numpy as np
 
 
@@ -197,7 +197,9 @@ def parabolic_angular_momentum(a: float, mu: float) -> float:
     return np.sqrt(mu * np.abs(a))  # p = a, not p = 2 * a
 
 
-def specific_orbital_energy(r: float | ArrayLike, v: float | ArrayLike, mu: float) -> float:
+def specific_orbital_energy(
+    r: float | ArrayLike, v: float | ArrayLike, mu: float
+) -> float:
     if not isinstance(r, (int, float)):
         r = np.asarray(r, dtype=np.float64).reshape((-1, 3))
         r = np.linalg.norm(r, axis=-1)
@@ -236,7 +238,9 @@ def mean_anomaly(n: float, t: float, tau: float = 0.0) -> float:
     return n * (t - tau)
 
 
-def eccentric_anomaly(M: float, e: float, atol: float = 1e-9, max_iter: int = 1000) -> float:
+def eccentric_anomaly(
+    M: float, e: float, atol: float = 1e-9, max_iter: int = 1000
+) -> float:
     converged = False
     E = M
     i = 0
@@ -271,7 +275,9 @@ def M_from_E(E: float, e: float) -> float:
     return E - e * np.sin(E)
 
 
-def hyperbolic_anomaly(M: float, e: float, atol: float = 1e-9, max_iter: int = 1000) -> float:
+def hyperbolic_anomaly(
+    M: float, e: float, atol: float = 1e-9, max_iter: int = 1000
+) -> float:
     """
     Newton iteration
     """
@@ -349,6 +355,3 @@ def sphere_of_influence(a: float, m: float, M: float) -> float:
         radius of the sphere of influence
     """
     return a * (m / M) ** (2 / 5)
-
-
-
