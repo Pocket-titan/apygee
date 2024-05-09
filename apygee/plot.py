@@ -9,7 +9,7 @@ from matplotlib.patches import Arc, FancyArrowPatch
 from matplotlib.transforms import Bbox, IdentityTransform, TransformedBbox
 from mpl_toolkits.mplot3d.proj3d import proj_transform
 
-from kepy.utils import mix_colors, omit
+from apygee.utils import mix_colors, omit
 
 
 def plot_dummy_line(pts: ArrayLike, ax=None):
@@ -196,15 +196,9 @@ def plot_vector_3d(
         ax.plot(*(origin + np.stack([[0, v[1], v[2]], v])).T, **kwl)
 
         kw = omit({**arrowprops}, "color")
-        _x = arrow3D(
-            [v[0], 0, 0], origin, ax=ax, arrow_kwargs={"color": "#E66B4C", **kw}, text="x"
-        )
-        _y = arrow3D(
-            [0, v[1], 0], origin, ax=ax, arrow_kwargs={"color": "#A4E64B", **kw}, text="y"
-        )
-        _z = arrow3D(
-            [0, 0, v[2]], origin, ax=ax, arrow_kwargs={"color": "#4C72E6", **kw}, text="z"
-        )
+        _x = arrow3D([v[0], 0, 0], origin, ax=ax, arrow_kwargs={"color": "#E66B4C", **kw}, text="x")
+        _y = arrow3D([0, v[1], 0], origin, ax=ax, arrow_kwargs={"color": "#A4E64B", **kw}, text="y")
+        _z = arrow3D([0, 0, v[2]], origin, ax=ax, arrow_kwargs={"color": "#4C72E6", **kw}, text="z")
 
     # Plot main vector after to ensure it's on top
     _arrow = arrow3D(
@@ -297,9 +291,7 @@ def plot_angle_3d(
     else:
         default_edgecolor = "k"
 
-    edgecolor = angle_kwargs.get("edgecolor") or angle_kwargs.pop(
-        "color", default_edgecolor
-    )
+    edgecolor = angle_kwargs.get("edgecolor") or angle_kwargs.pop("color", default_edgecolor)
     angleprops = dict(
         edgecolor=edgecolor,
         facecolor="none",
@@ -312,10 +304,7 @@ def plot_angle_3d(
     ax.add_artist(patch)
 
     if text is not None:
-        c = (
-            arc[0]
-            + ((arc[-2] if "facecolor" in angle_kwargs else arc[-1]) - arc[0]) * 0.5
-        )
+        c = arc[0] + ((arc[-2] if "facecolor" in angle_kwargs else arc[-1]) - arc[0]) * 0.5
         phic = np.arctan2(c[1], c[0])
         thetac = np.arccos(c[2] / np.linalg.norm(c))
         center = (
@@ -632,8 +621,7 @@ def arrow3D(
         head_length=0.45,
     )
     arrowprops = dict(
-        arrowstyle="Simple, "
-        + ", ".join(map(lambda x: f"{x[0]}={x[1]}", arrowstyle.items())),
+        arrowstyle="Simple, " + ", ".join(map(lambda x: f"{x[0]}={x[1]}", arrowstyle.items())),
         mutation_scale=20,
     )
     arrowprops.update(arrow_kwargs)

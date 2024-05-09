@@ -1,5 +1,5 @@
-from kepy.kepler import cart_to_kep, kep_to_cart, sphere_of_influence
-from kepy.constants import (
+from apygee.kepler import cart_to_kep, kep_to_cart, sphere_of_influence
+from apygee.constants import (
     MU_SUN,
     MU_MERCURY,
     MU_EARTH,
@@ -17,8 +17,8 @@ from kepy.constants import (
     URANUS,
     NEPTUNE,
 )
-from kepy.orbit import Orbit
-from kepy.plot import (
+from apygee.orbit import Orbit
+from apygee.plot import (
     plot_angle,
     plot_angle_2d,
     plot_angle_3d,
@@ -26,4 +26,4 @@ from kepy.plot import (
     plot_vector_2d,
     plot_vector_3d,
 )
-from kepy.utils import angle_between, rotate_vector, scale_vector
+from apygee.utils import angle_between, rotate_vector, scale_vector

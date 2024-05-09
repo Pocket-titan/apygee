@@ -1,5 +1,5 @@
 ```python
-from kepy import Orbit, MU_EARTH
+from apygee import Orbit, MU_EARTH
 
 orbit = Orbit([2e6], mu=MU_EARTH)
 print(orbit)

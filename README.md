@@ -1,25 +1,25 @@
-# KePy
+# Apygee
 
 <p align="start">
-  <a href="https://github.com/Pocket-titan/kepy">
+  <a href="https://github.com/Pocket-titan/apygee">
     <img src="logo.jpg" alt="Logo" width="200">
   </a>
 </p>
 
-KePy (pronounced kep-py) is a lightweight Python package for creating, manipulating and visualizing Kepler orbits.
+Apygee (apogee + `py`) is a lightweight Python package for creating, manipulating and visualizing Kepler orbits.
 
 ## Installation
 
 ```bash
-pip install kepy
+pip install apygee
 ```
 
 ## Usage
 
-The main export of Kepy is the `Orbit` class, which stores the keplerian elements and provides easy access to the astrodynamical properties of the orbit. It also contains methods for visualizing the orbit, and for performing mauevers in order to transfer to other orbits.
+The main export of Apygee is the `Orbit` class, which stores the keplerian elements and provides easy access to the astrodynamical properties of the orbit. It also contains methods for visualizing the orbit, and for performing mauevers in order to transfer to other orbits.
 
 ```python
-from kepy import Orbit, MU_EARTH
+from apygee import Orbit, MU_EARTH
 
 orbit = Orbit([2e6], mu=MU_EARTH)
 print(orbit)
