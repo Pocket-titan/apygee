@@ -1,8 +1,8 @@
 # KePy
 
-<p align="center">
+<p align="start">
   <a href="https://github.com/Pocket-titan/kepy">
-    <img src="logo.jpg" alt="Logo" width="280">
+    <img src="logo.jpg" alt="Logo" width="200">
   </a>
   <p align="center">
     kepler orbits in Python
