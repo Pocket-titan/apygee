@@ -4,9 +4,6 @@
   <a href="https://github.com/Pocket-titan/kepy">
     <img src="logo.jpg" alt="Logo" width="200">
   </a>
-  <p align="center">
-    kepler orbits in Python
-  </p>
 </p>
 
 KePy (pronounced kep-py) is a lightweight Python package for creating, manipulating and visualizing Kepler orbits.
