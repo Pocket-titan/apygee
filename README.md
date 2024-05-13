@@ -2,7 +2,7 @@
 
 <p align="start">
   <a href="https://github.com/Pocket-titan/apygee">
-    <img src="logo.jpg" alt="Logo" width="200">
+    <img src="https://raw.githubusercontent.com/Pocket-titan/apygee/main/logo.jpg" alt="Logo" width="200">
   </a>
 </p>
 
