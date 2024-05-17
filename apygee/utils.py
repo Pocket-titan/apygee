@@ -159,7 +159,9 @@ def dot(a: ArrayLike, b: ArrayLike) -> np.ndarray:
 def angle_between(a: ArrayLike, b: ArrayLike) -> float:
     a = np.asarray(a, dtype=np.float64)
     b = np.asarray(b, dtype=np.float64)
-    return np.arccos(np.clip(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)), -1, 1))
+    return np.round(
+        np.arccos(np.clip(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)), -1, 1)), 15
+    )
 
 
 def mix_colors(

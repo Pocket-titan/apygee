@@ -1,9 +1,10 @@
-from matplotlib.colors import to_rgba
+from typing import Unpack, TypedDict
 from numpy.typing import ArrayLike
 
 import matplotlib.pyplot as plt
 import numpy as np
 
+from matplotlib.colors import to_rgba
 from mpl_toolkits.mplot3d.art3d import Patch3D
 from matplotlib.patches import Arc, FancyArrowPatch
 from matplotlib.transforms import Bbox, IdentityTransform, TransformedBbox
@@ -34,22 +35,40 @@ def get_3d_axes():
     return ax
 
 
-def plot_vector(*args, ax=None, **kwargs):
+class VectorKwargs(TypedDict):
+    origin: ArrayLike
+    text: str | dict
+    color: str
+    plot_components: bool
+    arrow_kwargs: dict
+    text_kwargs: dict
+
+
+def plot_vector(v: ArrayLike, ax=None, **kwargs: Unpack[VectorKwargs]):
     ax = ax or plt.gca()
 
     if ax.name == "3d":
-        plot_vector_3d(*args, ax=ax, **kwargs)
+        plot_vector_3d(v, ax=ax, **kwargs)
     else:
-        plot_vector_2d(*args, ax=ax, **kwargs)
+        plot_vector_2d(v, ax=ax, **kwargs)
 
 
-def plot_angle(*args, ax=None, **kwargs):
+class AngleKwargs(TypedDict):
+    origin: ArrayLike
+    text: str
+    radius: float
+    unit: str
+    angle_kwargs: dict
+    text_kwargs: dict
+
+
+def plot_angle(v1: ArrayLike, v2: ArrayLike, ax=None, **kwargs: Unpack[AngleKwargs]):
     ax = ax or plt.gca()
 
     if ax.name == "3d":
-        plot_angle_3d(*args, ax=ax, **kwargs)
+        plot_angle_3d(v1, v2, ax=ax, **kwargs)
     else:
-        plot_angle_2d(*args, ax=ax, **kwargs)
+        plot_angle_2d(v1, v2, ax=ax, **kwargs)
 
 
 def plot_vector_2d(
@@ -72,7 +91,11 @@ def plot_vector_2d(
 
     arrow_kwargs = {**arrow_kwargs}
     zorder = arrow_kwargs.pop("zorder", None)
-    arrowprops = {"width": 1.5, "headwidth": 9, "headlength": 9, **arrow_kwargs}
+
+    if "arrowstyle" in arrow_kwargs:
+        arrowprops = {**arrow_kwargs}
+    else:
+        arrowprops = {"width": 1.5, "headwidth": 9, "headlength": 9, **arrow_kwargs}
 
     if plot_components:
         ax.annotate(
@@ -112,7 +135,7 @@ def plot_vector_2d(
         xy=origin + v,
         xytext=origin,
         xycoords="data",
-        arrowprops={**arrowprops, "color": color},
+        arrowprops={"color": color, **arrowprops},
         zorder=zorder,
     )
 
@@ -171,6 +194,7 @@ def plot_vector_3d(
     origin = np.asarray(origin).ravel()[:3]
     v = np.asarray(v).ravel()[:3]
     ax = ax or get_3d_axes()
+    ax.computed_zorder = False
 
     _color = plot_dummy_line(np.stack([origin, origin + v]).T, ax=ax)
     if color is None:
@@ -237,8 +261,8 @@ def plot_angle_2d(
 
     _angle = AngleAnnotation(
         origin,
-        v1,
-        v2,
+        origin + v1,
+        origin + v2,
         ax=ax,
         size=2 * radius,
         unit=unit,
@@ -264,6 +288,7 @@ def plot_angle_3d(
     v1 = np.asarray(v1).ravel()[:3]
     v2 = np.asarray(v2).ravel()[:3]
     ax = ax or get_3d_axes()
+    ax.computed_zorder = False
 
     if radius is None:
         [vn1, vn2] = [np.linalg.norm(v) for v in [v1, v2]]
@@ -276,7 +301,7 @@ def plot_angle_3d(
     )
     phis = np.arctan2(pts[:, 1], pts[:, 0])
     thetas = np.arccos(pts[:, 2] / np.linalg.norm(pts, axis=-1))
-    arc = np.stack(
+    arc = origin + np.stack(
         [
             radius * np.sin(thetas) * np.cos(phis),
             radius * np.sin(thetas) * np.sin(phis),
