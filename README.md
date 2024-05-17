@@ -59,7 +59,7 @@ plt.scatter([0], [0], s=100, color="orange")
 
 
 
-![png](examples_files/examples_1_1.png)
+![png](examples/examples_files/examples_1_1.png)
 
 
 
@@ -81,7 +81,7 @@ orbit.plot(show=["r", "r_p", "r_a"])
 
 
 
-![png](examples_files/examples_3_0.png)
+![png](examples/examples_files/examples_3_0.png)
 
 
 
@@ -102,7 +102,7 @@ orbit.plot(show=["r_p", "r", "theta", "n", "omega", "x", "Omega"])
 
 
 
-![png](examples_files/examples_5_0.png)
+![png](examples/examples_files/examples_5_0.png)
 
 
 
@@ -119,7 +119,7 @@ orbit.visualize()
 
 
 
-<img src="examples_files/orbitvis.png" alt="Orbit visualization" width="400px" />
+<img src="examples/examples_files/orbitvis.png" alt="Orbit visualization" width="400px" />
 
 
 
@@ -167,7 +167,7 @@ print(f"Δt = {dt/3600/24:.2f} days")
 
 
 
-![png](examples_files/examples_9_1.png)
+![png](examples/examples_files/examples_9_1.png)
 
 
 
@@ -217,7 +217,7 @@ print(f"Total Δv = {dv/1e3:.2f} km/s")
 
 
 
-![png](examples_files/examples_11_1.png)
+![png](examples/examples_files/examples_11_1.png)
 
 
 
@@ -342,7 +342,7 @@ plt.legend()
 
 
 
-![png](examples_files/examples_13_1.png)
+![png](examples/examples_files/examples_13_1.png)
 
 
 
@@ -391,7 +391,7 @@ plt.scatter([0], [0], s=100, color="orange", zorder=3)
 
 
 
-![png](examples_files/examples_15_1.png)
+![png](examples/examples_files/examples_15_1.png)
 
 
 
@@ -432,7 +432,7 @@ plt.legend(loc="upper right")
 
 
 
-![png](examples_files/examples_17_1.png)
+![png](examples/examples_files/examples_17_1.png)
 
 
 
@@ -474,7 +474,7 @@ print(angle_between(dv_vec, v0), x)
 
 
 
-![png](examples_files/examples_19_1.png)
+![png](examples/examples_files/examples_19_1.png)
 
 
 
