@@ -82,7 +82,8 @@ orbit.visualize()
 ```
 
 
-![png](examples_files/orbitvis.png)
+
+<img src="examples_files/orbitvis.png" alt="Orbit visualization" width="400px" />
 
 
 
