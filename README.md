@@ -1,5 +1,3 @@
-# Apygee
-
 <p align="center">
   <a href="https://github.com/Pocket-titan/apygee">
     <img src="https://raw.githubusercontent.com/Pocket-titan/apygee/main/logo.png" alt="Logo" height="200px">
@@ -8,8 +6,14 @@
 
 <br>
 
-[![PyPI version](https://badge.fury.io/py/apygee.svg)](https://badge.fury.io/py/apygee)
-[![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Pocket-titan/apygee)
+<p align="center">
+    <a href="https://pypi.org/project/apygee/">
+        <img src="https://badge.fury.io/py/apygee.svg" alt="View package on PyPi">
+    </a>
+    <a href="https://github.com/Pocket-titan/apygee">
+        <img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="View source code on GitHub">
+    </a>
+</p>
 
 Apygee (apogee + `py`) is a lightweight Python package for creating, manipulating and visualizing Kepler orbits.
 
