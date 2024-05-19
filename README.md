@@ -4,11 +4,9 @@
   </a>
 </p>
 <p align="center">
-    <a href="https://pypi.org/project/apygee/">
-        <img src="https://badge.fury.io/py/apygee.svg" alt="View package on PyPi"/>
-    </a>&nbsp;&nbsp;
+    <a href="https://pypi.org/project/apygee"><img src="https://badge.fury.io/py/apygee.svg" alt="View package on PyPi" height="18"></a>&nbsp;&nbsp;
     <a href="https://github.com/Pocket-titan/apygee">
-        <img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="View source code on GitHub"/>
+        <img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="View source code on GitHub" height="18"/>
     </a>
 </p>
 <br>
