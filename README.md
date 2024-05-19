@@ -2,7 +2,7 @@
 
 <p align="start">
   <a href="https://github.com/Pocket-titan/apygee">
-    <img src="https://raw.githubusercontent.com/Pocket-titan/apygee/main/logo.jpg" alt="Logo" width="200">
+    <img src="https://raw.githubusercontent.com/Pocket-titan/apygee/main/logo.png" alt="Logo" height="200px">
   </a>
 </p>
 
@@ -106,7 +106,7 @@ orbit.plot(show=["r_p", "r", "theta", "n", "omega", "x", "Omega"])
 
 
 
-### Visualize an orbit (requires plotly)
+### Visualize an orbit
 
 
 
@@ -119,7 +119,7 @@ orbit.visualize()
 
 
 
-<img src="https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/orbitvis.png" alt="Orbit visualization" width="400px" />
+<img src="https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/orbitvis.gif" alt="Orbit visualization" width="400px" />
 
 
 

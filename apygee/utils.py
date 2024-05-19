@@ -3,7 +3,6 @@ from numpy.typing import ArrayLike
 
 import matplotlib.pyplot as plt
 import numpy as np
-
 from matplotlib.colors import hsv_to_rgb, rgb_to_hsv, to_hex, to_rgb, to_rgba
 
 
@@ -160,7 +159,8 @@ def angle_between(a: ArrayLike, b: ArrayLike) -> float:
     a = np.asarray(a, dtype=np.float64)
     b = np.asarray(b, dtype=np.float64)
     return np.round(
-        np.arccos(np.clip(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)), -1, 1)), 15
+        np.arccos(np.clip(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)), -1, 1)),
+        15,
     )
 
 

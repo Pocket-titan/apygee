@@ -4,7 +4,6 @@ from numpy.typing import ArrayLike
 import matplotlib.pyplot as plt
 import numpy as np
 
-from apygee.plot import plot_vector, plot_angle
 from apygee.kepler import (
     E_from_theta,
     F_from_theta,
@@ -27,6 +26,7 @@ from apygee.kepler import (
     theta_from_E,
     theta_from_F,
 )
+from apygee.plot import plot_angle, plot_vector
 from apygee.utils import (
     angle_between,
     darken,
@@ -34,11 +34,11 @@ from apygee.utils import (
     deep_update,
     flatten,
     lighten,
-    omit,
-    scale_vector,
-    rotate_vector,
-    shorten_fstring_number,
     maybe_unwrap,
+    omit,
+    rotate_vector,
+    scale_vector,
+    shorten_fstring_number,
 )
 
 
@@ -264,18 +264,28 @@ class Orbit:
         rm = (A - np.sqrt(Delta)) / B
 
         if not (
-            ((a1 * (1 - e1) <= rp <= a1 * (1 + e1)) or (a2 * (1 - e2) <= rp <= a2 * (1 + e2)))
-            and ((a1 * (1 - e1) <= rm <= a1 * (1 + e1)) or (a2 * (1 - e2) <= rm <= a2 * (1 + e2)))
+            (
+                (a1 * (1 - e1) <= rp <= a1 * (1 + e1))
+                or (a2 * (1 - e2) <= rp <= a2 * (1 + e2))
+            )
+            and (
+                (a1 * (1 - e1) <= rm <= a1 * (1 + e1))
+                or (a2 * (1 - e2) <= rm <= a2 * (1 + e2))
+            )
         ):
             return False
 
         cp = (a1 * (1 - e1**2) - rp) / (rp * e1)
-        sp = (a2 * (1 - e2**2) - rp) / (rp * e2) * (1 / np.sin(domega)) - cp * (1 / np.tan(domega))
+        sp = (a2 * (1 - e2**2) - rp) / (rp * e2) * (1 / np.sin(domega)) - cp * (
+            1 / np.tan(domega)
+        )
 
         print(np.sin(domega), np.tan(domega))
 
         cm = (a1 * (1 - e1**2) - rm) / (rm * e1)
-        sm = (a2 * (1 - e2**2) - rm) / (rm * e2) * (1 / np.sin(domega)) - cm * (1 / np.tan(domega))
+        sm = (a2 * (1 - e2**2) - rm) / (rm * e2) * (1 / np.sin(domega)) - cm * (
+            1 / np.tan(domega)
+        )
 
         return (rp * np.array([cp, sp, 0]), rp * np.array([cm, sm, 0]))
 
@@ -624,10 +634,14 @@ class Orbit:
                 plot_vector(asc_node, text=label_map["n"], **vkwargs)
 
             if _map["i"] and is_3d:
-                plot_angle(z_dir, h_dir, text=label_map["i"], radius=angle_radius, **akwargs)
+                plot_angle(
+                    z_dir, h_dir, text=label_map["i"], radius=angle_radius, **akwargs
+                )
 
             if _map["omega"] and not np.isclose(_self.omega, [0, np.pi]).any():
-                plot_angle(asc_node, r_p, text=label_map["omega"], radius=angle_radius, **akwargs)
+                plot_angle(
+                    asc_node, r_p, text=label_map["omega"], radius=angle_radius, **akwargs
+                )
 
             if _map["Omega"] and not np.isclose(_self.Omega, [0, 2 * np.pi]).any():
                 ref_in_plane = rotate_vector(x_dir, asc_node, _self.i)
@@ -704,12 +718,12 @@ class Orbit:
         import plotly.graph_objects as go
         from IPython.display import display
         from ipywidgets import (
-            interactive_output,
             FloatSlider,
             GridBox,
             IntSlider,
             Label,
             Layout,
+            interactive_output,
         )
 
         colors = [
@@ -873,7 +887,9 @@ class Orbit:
         display(ui, fig)
 
     # Transfer methods
-    def impulsive_shot(self, dv: float | ArrayLike, x: float = None, theta: float = None) -> Self:
+    def impulsive_shot(
+        self, dv: float | ArrayLike, x: float = None, theta: float = None
+    ) -> Self:
         """
         Perform an impulsive shot maneuver. This is an idealized maneuver where the delta-v is applied instantaneously.
 
@@ -915,7 +931,9 @@ class Orbit:
             assert dv.size == 3, "dv must be a 3d vector"
             v1 = v0 + dv
 
-        return Orbit.from_cart(np.concatenate([self.at_theta(theta).r_vec, v1]), mu=self.mu)
+        return Orbit.from_cart(
+            np.concatenate([self.at_theta(theta).r_vec, v1]), mu=self.mu
+        )
 
     def coplanar_transfer(self, orbit: Self, theta_dep: float, theta_arr: float) -> Self:
         """

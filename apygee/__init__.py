@@ -1,22 +1,22 @@
-from apygee.kepler import cart_to_kep, kep_to_cart, sphere_of_influence
 from apygee.constants import (
-    MU_SUN,
-    MU_MERCURY,
-    MU_EARTH,
-    MU_MARS,
-    MU_JUPITER,
-    MU_SATURN,
-    MU_URANUS,
-    MU_NEPTUNE,
-    MERCURY,
-    VENUS,
     EARTH,
-    MARS,
     JUPITER,
+    MARS,
+    MERCURY,
+    MU_EARTH,
+    MU_JUPITER,
+    MU_MARS,
+    MU_MERCURY,
+    MU_NEPTUNE,
+    MU_SATURN,
+    MU_SUN,
+    MU_URANUS,
+    NEPTUNE,
     SATURN,
     URANUS,
-    NEPTUNE,
+    VENUS,
 )
+from apygee.kepler import cart_to_kep, kep_to_cart, sphere_of_influence
 from apygee.orbit import Orbit
 from apygee.plot import (
     plot_angle,
