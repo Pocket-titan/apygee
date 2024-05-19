@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "apygee"
-version = "1.0.4"
+version = "1.0.5"
 description = "A package for creating, manipulating and visualizing Kepler orbits"
 authors = ["Jelmar Gerritsen <jelmargerritsen@gmail.com>"]
 readme = "README.md"
