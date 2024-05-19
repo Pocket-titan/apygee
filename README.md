@@ -9,7 +9,8 @@
         <img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="View source code on GitHub" height="22"/>
     </a>
 </p>
-<br>
+<br/>
+
 Apygee (apogee + `py`) is a lightweight Python package for creating, manipulating and visualizing Kepler orbits.
 
 ## Installation
