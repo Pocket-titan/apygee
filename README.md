@@ -1,10 +1,15 @@
 # Apygee
 
-<p align="start">
+<p align="center">
   <a href="https://github.com/Pocket-titan/apygee">
     <img src="https://raw.githubusercontent.com/Pocket-titan/apygee/main/logo.png" alt="Logo" height="200px">
   </a>
 </p>
+
+<br>
+
+[![PyPI version](https://badge.fury.io/py/apygee.svg)](https://badge.fury.io/py/apygee)
+[![GitHub](https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Pocket-titan/apygee)
 
 Apygee (apogee + `py`) is a lightweight Python package for creating, manipulating and visualizing Kepler orbits.
 
@@ -27,7 +32,6 @@ print(orbit)
 
     Orbit([a=2e+6, e=0, i=0, Ω=0, ω=0, θ=0], μ=3.99e+14, type='circular')
 
-
 Apygee provides conversion functions between cartesian and keplerian elements, as provided by the exports `kep_to_cart` and `cart_to_kep`. The `Orbit` class also has a `from_cart` constructor to facilitate conversion.
 
 ## Examples
@@ -35,8 +39,6 @@ Apygee provides conversion functions between cartesian and keplerian elements, a
 For interactive versions, see the notebook in the `examples` directory.
 
 ### Plot the rocky planets in 2d
-
-
 
 ```python
 import matplotlib.pyplot as plt
@@ -50,22 +52,11 @@ MARS.plot()
 plt.scatter([0], [0], s=100, color="orange")
 ```
 
-
-
-
     <matplotlib.collections.PathCollection at 0x7fc0896a9280>
-
-
-
-
 
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_1_1.png)
 
-
-
 ### Plot an orbit in 3d
-
-
 
 ```python
 import numpy as np
@@ -79,15 +70,9 @@ ax = plt.axes(projection="3d")
 orbit.plot(show=["r", "r_p", "r_a"])
 ```
 
-
-
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_3_0.png)
 
-
-
 ### Plot orbital elements in 3d
-
-
 
 ```python
 import matplotlib.pyplot as plt
@@ -100,15 +85,9 @@ ax = plt.axes(projection="3d")
 orbit.plot(show=["r_p", "r", "theta", "n", "omega", "x", "Omega"])
 ```
 
-
-
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_5_0.png)
 
-
-
 ### Visualize an orbit
-
-
 
 ```python
 from apygee import Orbit, MU_EARTH
@@ -117,15 +96,9 @@ orbit = Orbit([2e6], mu=MU_EARTH)
 orbit.visualize()
 ```
 
-
-
 <img src="https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/orbitvis.gif" alt="Orbit visualization" width="400px" />
 
-
-
 ### Hohmann transfer from Earth to Mars
-
-
 
 ```python
 import numpy as np
@@ -164,16 +137,9 @@ print(f"Δt = {dt/3600/24:.2f} days")
     Total Δv = 5.59 km/s
     Δt = 258.86 days
 
-
-
-
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_9_1.png)
 
-
-
 ### Bielliptic (or double Hohmann) transfer from Earth to Mars
-
-
 
 ```python
 import numpy as np
@@ -214,16 +180,9 @@ print(f"Total Δv = {dv/1e3:.2f} km/s")
     Δv3 = 3.73 km/s
     Total Δv = 12.44 km/s
 
-
-
-
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_11_1.png)
 
-
-
 ### Computing delta-v gain for Bielliptic over Hohmann transfer
-
-
 
 ```python
 from itertools import product
@@ -333,22 +292,11 @@ plt.ylim([0, 8])
 plt.legend()
 ```
 
-
-
-
     <matplotlib.legend.Legend at 0x7fc07ec34b30>
-
-
-
-
 
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_13_1.png)
 
-
-
 ### General coplanar transfer
-
-
 
 ```python
 import numpy as np
@@ -382,22 +330,11 @@ transfer.plot(
 plt.scatter([0], [0], s=100, color="orange", zorder=3)
 ```
 
-
-
-
     <matplotlib.collections.PathCollection at 0x7fc07ec355b0>
-
-
-
-
 
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_15_1.png)
 
-
-
 ### Impulsive shot
-
-
 
 ```python
 import matplotlib.pyplot as plt
@@ -423,22 +360,11 @@ plt.xlim(np.array(plt.xlim()) * [1, 1.4])
 plt.legend(loc="upper right")
 ```
 
-
-
-
     <matplotlib.legend.Legend at 0x7fc07ecdd010>
-
-
-
-
 
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_17_1.png)
 
-
-
 The angle `x` is measured between the `dv` vector and `v0`, which we can visualize using the utility functions `plot_vector` and `plot_angle`:
-
-
 
 ```python
 from apygee.plot import plot_vector, plot_angle
@@ -471,12 +397,7 @@ print(angle_between(dv_vec, v0), x)
 
     0.789 0.789
 
-
-
-
 ![png](https://raw.githubusercontent.com/Pocket-titan/apygee/main/examples/examples_files/examples_19_1.png)
-
-
 
 ## Contributing
 
@@ -487,10 +408,9 @@ Contributions are welcome! For bug reports or feature requests, please submit an
 This course is mainly based on the courses "Fundamentals of Astrodynamics" and "Numerical Astrodynamics" that I attended at TU Delft, taught by the wonderful Kevin Cowan. In addition, the following sources are used:
 
 1. [**Orbital Mechanics & Astrodynamics**](https://orbital-mechanics.space/). (n.d.). Retrieved from https://orbital-mechanics.space/
-2. Bate, R. R., Mueller, D. D., White, J. E., & Saylor, W. W. (2020). *Fundamentals of Astrodynamics* (Revised and updated second edition). Dover Publications, Inc.
-3. Curtis, H. D. (2020). *Orbital Mechanics for Engineering Students* (4th ed.). Elsevier. ISBN 978-0-08-102133-0.
-4. de Pater, I., & Lissauer, J. J. (2015). *Planetary Sciences* (2nd ed.). Cambridge: Cambridge University Press.
-
+2. Bate, R. R., Mueller, D. D., White, J. E., & Saylor, W. W. (2020). _Fundamentals of Astrodynamics_ (Revised and updated second edition). Dover Publications, Inc.
+3. Curtis, H. D. (2020). _Orbital Mechanics for Engineering Students_ (4th ed.). Elsevier. ISBN 978-0-08-102133-0.
+4. de Pater, I., & Lissauer, J. J. (2015). _Planetary Sciences_ (2nd ed.). Cambridge: Cambridge University Press.
 
 ## License
 
